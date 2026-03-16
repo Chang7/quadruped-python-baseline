@@ -34,8 +34,10 @@ python main.py
 
 ## Output
 
-Running `main.py` saves three figures in the `outputs` folder:
+Running `main.py` saves figures in the local `outputs` folder:
 
 - `fig_velocity_tracking_refined.png`
 - `fig_yaw_tracking_refined.png`
 - `fig_leg_fz_subplots.png`
+
+The `outputs/` directory is gitignored and is not included in the repository.

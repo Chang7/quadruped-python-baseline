@@ -29,7 +29,6 @@ Two example scenarios are included:
 - `plant.py`: SRB propagation
 - `plotting.py`: result plotting
 - `docs/`: notes and reference material
-- `outputs/`: generated figures after running simulations
 
 ## Setup
 
@@ -57,12 +56,13 @@ python main.py --scenario turn_pi_over_4
 
 ## Outputs
 
-Figures are saved under:
+Running a scenario generates figures locally under:
 
 - `outputs/straight_trot/`
 - `outputs/turn_pi_over_4/`
 
 Typical plots include velocity tracking, yaw tracking, XY path, and per-leg normal force.
+The `outputs/` directory is gitignored and is not included in the repository.
 
 ## Notes
 
