@@ -1,0 +1,17 @@
+Baseline review note
+
+This Python project preserves the following high-level MATLAB loop:
+
+Convex_MPC.m
+ -> fcn_FSM / contact scheduling
+ -> fcn_gen_XdUd / reference rollout
+ -> get_QP or sim_MPC / force optimization
+ -> dynamics_SRB / closed-loop propagation
+
+What was intentionally kept simple:
+- fixed 12D force input
+- OSQP sparse stacked QP
+- fixed nominal footholds rotated by yaw
+- no swing-foot touchdown update
+- single-rate simulation
+- forward-Euler discretization
