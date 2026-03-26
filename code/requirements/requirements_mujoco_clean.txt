@@ -1,4 +1,0 @@
-imageio
-imageio-ffmpeg
-pillow
-matplotlib

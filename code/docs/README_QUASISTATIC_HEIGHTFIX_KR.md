@@ -1,1 +1,0 @@
-Use run_mujoco_quasistatic_heightfix.py instead of run_mujoco_quasistatic_fixed.py. Main fixes: gravity compensation in support, target height raised to nominal height, earlier recovery, softer COM shifts.

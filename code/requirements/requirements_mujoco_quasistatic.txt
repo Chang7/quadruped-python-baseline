@@ -1,5 +1,0 @@
-mujoco
-numpy
-matplotlib
-imageio
-imageio-ffmpeg

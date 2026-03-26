@@ -1,5 +1,0 @@
-mujoco
-numpy
-scipy
-matplotlib
-osqp
