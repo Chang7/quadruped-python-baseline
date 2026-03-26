@@ -2,15 +2,15 @@ import argparse
 import traceback
 import numpy as np
 
-from config import make_config, IDX_G
-from fsm import rollout_contact_schedule
-from reference import rollout_reference
-from footholds import nominal_foot_positions_world
-from model import build_prediction_model
-from qp_builder import build_qp
-from controller_osqp import MPCControllerOSQP
-from plant import step_srb
-from plotting import plot_logs
+from baseline.config import make_config, IDX_G
+from baseline.fsm import rollout_contact_schedule
+from baseline.reference import rollout_reference
+from baseline.footholds import nominal_foot_positions_world
+from baseline.model import build_prediction_model
+from baseline.qp_builder import build_qp
+from baseline.controller_osqp import MPCControllerOSQP
+from baseline.plant import step_srb
+from baseline.plotting import plot_logs
 
 
 def make_initial_state(cfg) -> np.ndarray:

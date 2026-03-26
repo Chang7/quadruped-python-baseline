@@ -1,5 +1,5 @@
 import numpy as np
-from config import MPCConfig
+from baseline.config import MPCConfig
 
 
 def _cycle_time(cfg: MPCConfig) -> float:

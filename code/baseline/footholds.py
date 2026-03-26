@@ -1,5 +1,5 @@
 import numpy as np
-from config import MPCConfig, IDX_TH
+from baseline.config import MPCConfig, IDX_TH
 
 
 def rz(yaw: float) -> np.ndarray:

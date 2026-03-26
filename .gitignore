@@ -5,3 +5,10 @@ __pycache__/
 *.pdf
 .DS_Store
 outputs/
+code/.venv/
+code/mujoco_menagerie/
+code/outputs*/
+code/**/__pycache__/
+code.z0*
+code.zip
+*.docx

@@ -1,5 +1,5 @@
 import numpy as np
-from config import MPCConfig, IDX_P, IDX_V, IDX_TH, IDX_W, IDX_G
+from baseline.config import MPCConfig, IDX_P, IDX_V, IDX_TH, IDX_W, IDX_G
 
 
 def _speed_profile(t: float, cfg: MPCConfig) -> float:

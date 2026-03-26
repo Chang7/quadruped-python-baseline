@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 from scipy import sparse
-from config import MPCConfig
+from baseline.config import MPCConfig
 
 
 @dataclass

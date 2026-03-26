@@ -1,6 +1,6 @@
 import osqp
 import numpy as np
-from qp_builder import QPData
+from baseline.qp_builder import QPData
 
 
 class MPCControllerOSQP:
