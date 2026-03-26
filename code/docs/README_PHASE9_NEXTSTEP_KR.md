@@ -20,22 +20,22 @@ A1 lower-leg에는 foot sphere 외에도 floor와 접촉 가능한 capsule geoms
 
 ### 1) 현재 contact support audit
 ```bash
-python runner_mujoco_phase9.py \
+python phases/runner_mujoco_phase9.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase9/support_audit \
+  --output-dir local_outputs/outputs_mujoco_phase9/support_audit \
   --realization external \
   --force-frame body
 ```
 
 ### 2) foot-only collision 강제
 ```bash
-python runner_mujoco_phase9.py \
+python phases/runner_mujoco_phase9.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase9/foot_only_collision \
+  --output-dir local_outputs/outputs_mujoco_phase9/foot_only_collision \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision

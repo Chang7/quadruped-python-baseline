@@ -30,11 +30,11 @@
 
 ```bash
 source .venv/bin/activate
-python runner_mujoco_phase8.py \
+python phases/runner_mujoco_phase8.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase8/external_ref \
+  --output-dir local_outputs/outputs_mujoco_phase8/external_ref \
   --realization external \
   --force-frame body
 ```
@@ -42,11 +42,11 @@ python runner_mujoco_phase8.py \
 ### 2) 비교점: joint realization + body frame
 
 ```bash
-python runner_mujoco_phase8.py \
+python phases/runner_mujoco_phase8.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase8/joint_realization \
+  --output-dir local_outputs/outputs_mujoco_phase8/joint_realization \
   --realization joint \
   --force-frame body
 ```

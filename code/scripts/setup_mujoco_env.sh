@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
 if [ ! -d .venv ]; then
   python3 -m venv .venv
 fi
@@ -16,4 +19,4 @@ fi
 echo "Done. Next:"
 echo "  source .venv/bin/activate"
 echo "  python -m mujoco.viewer --mjcf=./mujoco_menagerie/unitree_a1/scene.xml"
-echo "  python runner_mujoco_smoke.py --model ./mujoco_menagerie/unitree_a1/scene.xml --scenario straight_trot"
+echo "  python phases/runner_mujoco_smoke.py --model ./mujoco_menagerie/unitree_a1/scene.xml --scenario straight_trot"

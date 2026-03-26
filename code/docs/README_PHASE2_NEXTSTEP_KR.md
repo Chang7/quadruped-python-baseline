@@ -32,22 +32,22 @@ python inspect_leg_geoms.py
 그 다음:
 
 ```bash
-python runner_mujoco_phase2.py \
+python phases/runner_mujoco_phase2.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase2/straight_amp034 \
+  --output-dir local_outputs/outputs_mujoco_phase2/straight_amp034 \
   --swing-amp 0.34
 ```
 
 필요하면 amplitude를 더 올려서 비교:
 
 ```bash
-python runner_mujoco_phase2.py \
+python phases/runner_mujoco_phase2.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase2/straight_amp040 \
+  --output-dir local_outputs/outputs_mujoco_phase2/straight_amp040 \
   --swing-amp 0.40
 ```
 

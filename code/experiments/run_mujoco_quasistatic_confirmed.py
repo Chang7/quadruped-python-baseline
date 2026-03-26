@@ -1,5 +1,10 @@
-
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import argparse
 import json
@@ -41,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Confirmed quasi-static MuJoCo crawl using the Python MPC core.")
     p.add_argument("--scenario", type=str, default="straight_trot")
     p.add_argument("--model", type=str, required=True)
-    p.add_argument("--output-dir", type=str, default="outputs_mujoco_quasistatic")
+    p.add_argument("--output-dir", type=str, default="local_outputs/outputs_mujoco_quasistatic")
     p.add_argument("--headless", action="store_true")
     p.add_argument("--disable-nonfoot-collision", action="store_true")
 

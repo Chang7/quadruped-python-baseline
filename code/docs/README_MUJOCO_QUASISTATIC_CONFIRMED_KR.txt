@@ -46,17 +46,17 @@ The MuJoCo side is rewritten so that:
 
 Recommended first run
 ---------------------
-python run_mujoco_quasistatic_confirmed.py \
+python experiments/run_mujoco_quasistatic_confirmed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_quasistatic/live \
+  --output-dir local_outputs/outputs_mujoco_quasistatic/live \
   --disable-nonfoot-collision \
   --support-enabled
 
 More visible stepping
 ---------------------
-python run_mujoco_quasistatic_confirmed.py \
+python experiments/run_mujoco_quasistatic_confirmed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_quasistatic/visible \
+  --output-dir local_outputs/outputs_mujoco_quasistatic/visible \
   --disable-nonfoot-collision \
   --support-enabled \
   --clearance 0.095 \
@@ -67,13 +67,13 @@ python run_mujoco_quasistatic_confirmed.py \
 
 Video export
 ------------
-python run_mujoco_quasistatic_confirmed.py \
+python experiments/run_mujoco_quasistatic_confirmed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --headless \
-  --output-dir outputs_mujoco_quasistatic/mp4 \
+  --output-dir local_outputs/outputs_mujoco_quasistatic/mp4 \
   --disable-nonfoot-collision \
   --support-enabled \
-  --save-mp4 outputs_mujoco_quasistatic/mp4/quasistatic.mp4
+  --save-mp4 local_outputs/outputs_mujoco_quasistatic/mp4/quasistatic.mp4
 
 Main outputs
 ------------

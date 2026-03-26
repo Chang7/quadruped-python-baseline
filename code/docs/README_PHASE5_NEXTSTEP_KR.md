@@ -16,21 +16,21 @@
 
 ```bash
 source .venv/bin/activate
-python runner_mujoco_phase5.py \
+python phases/runner_mujoco_phase5.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase5/default
+  --output-dir local_outputs/outputs_mujoco_phase5/default
 ```
 
 ## 조금 더 rear-biased 하게
 
 ```bash
-python runner_mujoco_phase5.py \
+python phases/runner_mujoco_phase5.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase5/rear_more \
+  --output-dir local_outputs/outputs_mujoco_phase5/rear_more \
   --rear-step-scale 0.55 \
   --touchdown-depth-rear 0.055 \
   --touchdown-search-window-rear 0.12 \

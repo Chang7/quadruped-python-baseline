@@ -21,21 +21,21 @@
 ## 바로 돌릴 추천 2개
 
 ```bash
-python runner_mujoco_phase7.py \
+python phases/runner_mujoco_phase7.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase7/external_ref \
+  --output-dir local_outputs/outputs_mujoco_phase7/external_ref \
   --realization external \
   --force-frame body
 ```
 
 ```bash
-python runner_mujoco_phase7.py \
+python phases/runner_mujoco_phase7.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase7/joint_realization \
+  --output-dir local_outputs/outputs_mujoco_phase7/joint_realization \
   --realization joint \
   --force-frame body
 ```

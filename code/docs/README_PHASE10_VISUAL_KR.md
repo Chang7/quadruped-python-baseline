@@ -33,10 +33,10 @@ pip install -r requirements_mujoco_visual.txt
 `--headless`를 빼면 실시간 창이 뜹니다.
 
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase10_visual/live_view \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/live_view \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision
@@ -44,41 +44,41 @@ python runner_mujoco_phase10_visual.py \
 
 ## 가장 추천하는 실행 2: GIF 저장
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10_visual/gif_run \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/gif_run \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision \
-  --save-gif outputs_mujoco_phase10_visual/gif_run/straight_trot.gif
+  --save-gif local_outputs/outputs_mujoco_phase10_visual/gif_run/straight_trot.gif
 ```
 
 ## MP4 저장
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10_visual/mp4_run \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/mp4_run \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision \
-  --save-mp4 outputs_mujoco_phase10_visual/mp4_run/straight_trot.mp4
+  --save-mp4 local_outputs/outputs_mujoco_phase10_visual/mp4_run/straight_trot.mp4
 ```
 
 ## 카메라 조정 예시
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10_visual/cam_test \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/cam_test \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision \
-  --save-gif outputs_mujoco_phase10_visual/cam_test/straight_trot.gif \
+  --save-gif local_outputs/outputs_mujoco_phase10_visual/cam_test/straight_trot.gif \
   --camera-distance 1.6 \
   --camera-azimuth 120 \
   --camera-elevation -18
@@ -97,10 +97,10 @@ python runner_mujoco_phase10_visual.py \
 ## 지금 네 상황에서 가장 추천하는 명령
 ### 1. 먼저 실제 창으로 보기
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase10_visual/live_view \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/live_view \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision
@@ -108,15 +108,15 @@ python runner_mujoco_phase10_visual.py \
 
 ### 2. 그다음 GIF 저장
 ```bash
-python runner_mujoco_phase10_visual.py \
+python phases/runner_mujoco_phase10_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10_visual/record \
+  --output-dir local_outputs/outputs_mujoco_phase10_visual/record \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision \
-  --save-gif outputs_mujoco_phase10_visual/record/straight_trot.gif
+  --save-gif local_outputs/outputs_mujoco_phase10_visual/record/straight_trot.gif
 ```
 
 ## 출력 파일

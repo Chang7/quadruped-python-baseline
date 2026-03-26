@@ -27,18 +27,18 @@
 
 ## 기본 실행
 ```bash
-python run_mujoco_adaptive_clean.py \
+python experiments/run_mujoco_adaptive_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_adaptive/live \
+  --output-dir local_outputs/outputs_mujoco_adaptive/live \
   --disable-nonfoot-collision \
   --support-enabled
 ```
 
 ## 조금 더 보수적인 추천 실행
 ```bash
-python run_mujoco_adaptive_clean.py \
+python experiments/run_mujoco_adaptive_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_adaptive/live_safe \
+  --output-dir local_outputs/outputs_mujoco_adaptive/live_safe \
   --disable-nonfoot-collision \
   --support-enabled \
   --desired-speed-cap 0.12 \
@@ -53,13 +53,13 @@ python run_mujoco_adaptive_clean.py \
 
 ## MP4 저장
 ```bash
-python run_mujoco_adaptive_clean.py \
+python experiments/run_mujoco_adaptive_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --headless \
-  --output-dir outputs_mujoco_adaptive/mp4 \
+  --output-dir local_outputs/outputs_mujoco_adaptive/mp4 \
   --disable-nonfoot-collision \
   --support-enabled \
-  --save-mp4 outputs_mujoco_adaptive/mp4/adaptive.mp4
+  --save-mp4 local_outputs/outputs_mujoco_adaptive/mp4/adaptive.mp4
 ```
 
 ## 새로 기록되는 핵심 지표

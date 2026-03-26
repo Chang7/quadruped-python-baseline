@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import traceback
+
 import numpy as np
 import mujoco
 import mujoco.viewer
@@ -16,7 +23,6 @@ from baseline.plotting import plot_logs
 from phases.mujoco_phase5_helpers import (
     FALLBACK_FOOT_LOCAL_OFFSET,
     discover_model_bindings,
-    foot_point_world,
     foot_rel_world,
     mujoco_to_x,
     force_to_qfrc,
@@ -27,12 +33,18 @@ from phases.mujoco_phase5_helpers import (
     initialize_phase5_leg_state,
     update_phase5_state_pre,
     update_phase5_state_post,
-    build_ctrl_targets_phase5,
     stance_force_enable_mask_phase5,
     print_binding_summary,
 )
-from phases.mujoco_phase6_helpers import build_phase6_summary, write_phase6_summary
 from phases.mujoco_phase7_helpers import leg_internal_force_to_qfrc
+from phases.mujoco_phase9_helpers import (
+    accumulate_actual_foot_and_support_candidates,
+    build_phase9_summary,
+    write_phase9_summary,
+    save_phase9_plots,
+    disable_nonfoot_leg_collisions,
+)
+from phases.mujoco_phase10_helpers import build_ctrl_targets_phase10
 
 
 def _transform_force(f: np.ndarray, d: mujoco.MjData, base_body_name: str, force_frame: str) -> np.ndarray:
@@ -45,7 +57,7 @@ def _transform_force(f: np.ndarray, d: mujoco.MjData, base_body_name: str, force
     raise ValueError(f'Unknown force_frame={force_frame}')
 
 
-def run_mujoco_phase7(
+def run_mujoco_phase10(
     cfg,
     model_path: str,
     viewer: bool = True,
@@ -65,39 +77,40 @@ def run_mujoco_phase7(
     fy_scale: float = 1.0,
     fz_scale: float = 1.0,
     zero_tangential: bool = False,
-    realization: str = 'joint',
+    realization: str = 'external',
+    disable_nonfoot_collision: bool = False,
+    rear_stance_press: float = 0.015,
+    rear_stance_back: float = 0.008,
+    front_stance_unload: float = 0.004,
 ) -> tuple[dict, list[str], dict | None]:
     controller = MPCControllerOSQP(verbose=False)
 
     m = mujoco.MjModel.from_xml_path(model_path)
     d = mujoco.MjData(m)
-
-    if m.nkey > 0:
-        mujoco.mj_resetDataKeyframe(m, d, 0)
-    else:
-        mujoco.mj_resetData(m, d)
+    mujoco.mj_forward(m, d)
 
     bindings = discover_model_bindings(m)
-    print(print_binding_summary(bindings))
+    print_binding_summary(bindings)
+    if disable_nonfoot_collision:
+        disabled = disable_nonfoot_leg_collisions(m, bindings)
+        print('Disabled non-foot collision geoms:', disabled)
+        mujoco.mj_forward(m, d)
 
-    home_ctrl = resolve_home_ctrl(m, d)
-
-    mujoco.mj_kinematics(m, d)
-    mujoco.mj_comPos(m, d)
     store_home_joint_qpos(d, bindings)
     compute_swing_delta_maps(m, d, bindings)
     initialize_phase5_leg_state(bindings)
+    home_ctrl = resolve_home_ctrl(m, d)
 
     next_mpc_time = 0.0
     u_hold = np.zeros(cfg.nu, dtype=float)
     x_ref0_hold = np.zeros(cfg.nx, dtype=float)
     scheduled_contact_hold = np.zeros(4, dtype=bool)
-    prev_sched = np.ones(4, dtype=bool)
+    prev_sched = np.zeros(4, dtype=bool)
 
     if step_len_front is None:
-        step_len_front = max(0.03, min(0.08, 0.55 * cfg.desired_speed * cfg.swing_time))
+        step_len_front = 0.05
     if touchdown_forward_front is None:
-        touchdown_forward_front = max(0.012, min(0.03, 0.40 * step_len_front))
+        touchdown_forward_front = max(0.010, 0.40 * step_len_front)
     if touchdown_search_window_front is None:
         touchdown_search_window_front = max(0.04, 0.60 * cfg.stance_time)
 
@@ -110,6 +123,10 @@ def run_mujoco_phase7(
         'contact_actual': [],
         'contact_force_enabled': [],
         'x_ref0': [],
+        'actual_grf_a': [],
+        'actual_grf_b': [],
+        'actual_support_a': [],
+        'actual_support_b': [],
     }
 
     def one_step() -> bool:
@@ -143,7 +160,7 @@ def run_mujoco_phase7(
         update_phase5_state_pre(d, bindings, prev_sched, scheduled_contact_hold)
 
         if m.nu > 0:
-            d.ctrl[:] = build_ctrl_targets_phase5(
+            d.ctrl[:] = build_ctrl_targets_phase10(
                 m=m,
                 d=d,
                 bindings=bindings,
@@ -160,6 +177,9 @@ def run_mujoco_phase7(
                 touchdown_forward_rear=touchdown_forward_rear,
                 touchdown_search_window_front=touchdown_search_window_front,
                 touchdown_search_window_rear=touchdown_search_window_rear,
+                rear_stance_press=rear_stance_press,
+                rear_stance_back=rear_stance_back,
+                front_stance_unload=front_stance_unload,
             )
 
         force_enabled = stance_force_enable_mask_phase5(d, bindings, scheduled_contact_hold, actual_pre)
@@ -177,7 +197,11 @@ def run_mujoco_phase7(
             f[2] *= fz_scale
             f_world = _transform_force(f, d, bindings.base_body_name, force_frame)
             u_applied[3 * leg_i : 3 * leg_i + 3] = f_world
-            point_world = foot_point_world(d, binding, FALLBACK_FOOT_LOCAL_OFFSET)
+            point_world = bindings.leg_bindings[leg_i].foot_local_offset if False else None
+            point_world = None  # quiet linter; actual point below
+            point_world = d.xpos[binding.calf_body_id] + d.xmat[binding.calf_body_id].reshape(3, 3) @ (
+                binding.foot_local_offset if getattr(binding, 'foot_local_offset', None) is not None else FALLBACK_FOOT_LOCAL_OFFSET
+            )
             if realization == 'external':
                 d.qfrc_applied[:] += force_to_qfrc(m, d, binding.calf_body_name, point_world, f_world)
             elif realization == 'joint':
@@ -193,6 +217,7 @@ def run_mujoco_phase7(
         prev_sched = scheduled_contact_hold.copy()
 
         x_now = mujoco_to_x(d, cfg, bindings.base_body_name)
+        foot_a, foot_b, support_a, support_b = accumulate_actual_foot_and_support_candidates(m, d, bindings)
 
         log['t'].append(float(d.time))
         log['x'].append(x_now.copy())
@@ -202,6 +227,10 @@ def run_mujoco_phase7(
         log['contact_actual'].append(actual_post.copy())
         log['contact_force_enabled'].append(force_enabled.copy())
         log['x_ref0'].append(x_ref0_hold.copy())
+        log['actual_grf_a'].append(foot_a.copy())
+        log['actual_grf_b'].append(foot_b.copy())
+        log['actual_support_a'].append(support_a.copy())
+        log['actual_support_b'].append(support_b.copy())
         return d.time < cfg.sim_time
 
     if viewer:
@@ -219,57 +248,32 @@ def run_mujoco_phase7(
     saved = []
     summary = None
     if output_dir is not None:
-        saved = plot_logs(log, cfg, output_dir=output_dir)
-        summary = build_phase6_summary(log, bindings)
+        saved.extend(plot_logs(log, cfg, output_dir=output_dir))
+        saved.extend(save_phase9_plots(log, output_dir=output_dir))
+        summary = build_phase9_summary(log, bindings, disable_nonfoot_collision=disable_nonfoot_collision)
         summary['realization'] = realization
-        saved.append(write_phase6_summary(output_dir, summary))
+        summary['rear_stance_press'] = float(rear_stance_press)
+        summary['rear_stance_back'] = float(rear_stance_back)
+        summary['front_stance_unload'] = float(front_stance_unload)
+        saved.append(write_phase9_summary(output_dir, summary))
     else:
-        summary = build_phase6_summary(log, bindings)
+        summary = build_phase9_summary(log, bindings, disable_nonfoot_collision=disable_nonfoot_collision)
         summary['realization'] = realization
+        summary['rear_stance_press'] = float(rear_stance_press)
+        summary['rear_stance_back'] = float(rear_stance_back)
+        summary['front_stance_unload'] = float(front_stance_unload)
 
-    if summary is not None:
-        print('Mean mismatch ratio:', round(summary['mean_mismatch_ratio'], 3))
-        print('Mean vx after 1.0 s:', round(summary['mean_vx_after_1s'], 3))
-        print('Mean sum Fx after 1.0 s:', round(summary['mean_sum_fx_after_1s'], 3))
-        print('Mean sum Fy after 1.0 s:', round(summary['mean_sum_fy_after_1s'], 3))
-        print('Mean sum Fz after 1.0 s:', round(summary['mean_sum_fz_after_1s'], 3))
-        for item in summary['per_leg']:
-            print(
-                f"{item['leg']}: stance_success={item['stance_success_ratio']:.3f}, "
-                f"force_enabled={item['force_enabled_ratio']:.3f}, "
-                f"mean_fx={item['mean_fx_when_enabled']:.3f}, "
-                f"mean_fy={item['mean_fy_when_enabled']:.3f}, "
-                f"mean_fz={item['mean_fz_when_enabled']:.3f}, "
-                f"touchdown_delay_mean={item['touchdown_delay_mean_s']}"
-            )
-
-    print(
-        'Phase-7 params: '
-        f'realization={realization}, '
-        f'clearance={clearance:.3f} m, '
-        f'step_len_front={step_len_front:.3f} m, '
-        f'rear_step_scale={rear_step_scale:.3f}, '
-        f'td_depth_front={touchdown_depth_front:.3f} m, '
-        f'td_depth_rear={touchdown_depth_rear:.3f} m, '
-        f'td_fwd_front={touchdown_forward_front:.3f} m, '
-        f'td_fwd_rear={touchdown_forward_rear:.3f} m, '
-        f'td_window_front={touchdown_search_window_front:.3f} s, '
-        f'td_window_rear={touchdown_search_window_rear:.3f} s, '
-        f'stance_hold_time={stance_hold_time:.3f} s, '
-        f'force_frame={force_frame}, fx_scale={fx_scale:.3f}, fy_scale={fy_scale:.3f}, fz_scale={fz_scale:.3f}, '
-        f'zero_tangential={zero_tangential}'
-    )
     return log, saved, summary
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='MuJoCo phase-7: compare external foot wrench vs internal J^T f leg torque realization')
-    parser.add_argument('--scenario', default='straight_trot', choices=['straight_trot', 'turn_pi_over_4'])
-    parser.add_argument('--model', default='./mujoco_menagerie/unitree_a1/scene.xml')
+def main() -> int:
+    parser = argparse.ArgumentParser(description='MuJoCo phase-10: rear stance load-bias experiment')
+    parser.add_argument('--model', required=True)
+    parser.add_argument('--scenario', default='straight_trot')
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--output-dir', default='outputs_mujoco_phase7/run')
+    parser.add_argument('--output-dir', default=None)
     parser.add_argument('--clearance', type=float, default=0.05)
-    parser.add_argument('--step-len-front', type=float, default=None)
+    parser.add_argument('--step-len-front', type=float, default=0.05)
     parser.add_argument('--rear-step-scale', type=float, default=0.65)
     parser.add_argument('--touchdown-depth-front', type=float, default=0.035)
     parser.add_argument('--touchdown-depth-rear', type=float, default=0.05)
@@ -283,15 +287,19 @@ if __name__ == '__main__':
     parser.add_argument('--fy-scale', type=float, default=1.0)
     parser.add_argument('--fz-scale', type=float, default=1.0)
     parser.add_argument('--zero-tangential', action='store_true')
-    parser.add_argument('--realization', choices=['external', 'joint'], default='joint')
+    parser.add_argument('--realization', choices=['external', 'joint'], default='external')
+    parser.add_argument('--disable-nonfoot-collision', action='store_true')
+    parser.add_argument('--rear-stance-press', type=float, default=0.015)
+    parser.add_argument('--rear-stance-back', type=float, default=0.008)
+    parser.add_argument('--front-stance-unload', type=float, default=0.004)
     args = parser.parse_args()
 
     cfg = make_config(args.scenario)
     try:
-        _, saved, _ = run_mujoco_phase7(
+        _, saved, summary = run_mujoco_phase10(
             cfg=cfg,
             model_path=args.model,
-            viewer=(not args.headless),
+            viewer=not args.headless,
             output_dir=args.output_dir,
             clearance=args.clearance,
             step_len_front=args.step_len_front,
@@ -309,13 +317,28 @@ if __name__ == '__main__':
             fz_scale=args.fz_scale,
             zero_tangential=args.zero_tangential,
             realization=args.realization,
+            disable_nonfoot_collision=args.disable_nonfoot_collision,
+            rear_stance_press=args.rear_stance_press,
+            rear_stance_back=args.rear_stance_back,
+            front_stance_unload=args.front_stance_unload,
         )
-        print(f'MuJoCo phase-7 run finished for scenario: {args.scenario}')
-        print(f'Model: {args.model}')
-        print('Saved outputs:')
-        for p in saved:
-            print(f' - {p}')
+        print(f"MuJoCo phase-10 run finished for scenario: {args.scenario}")
+        print(f"Model: {args.model}")
+        if summary is not None:
+            print(f"Mean mismatch ratio: {summary.get('mean_mismatch_ratio')}")
+            print(f"Mean vx after 1.0 s: {summary.get('mean_vx_after_1s')}")
+            print(f"Mean actual FOOT sum Fz after 1.0 s: {summary.get('mean_actual_sum_fz_after_1s')}")
+            print(f"Mean actual SUPPORT sum Fz after 1.0 s: {summary.get('mean_actual_support_sum_fz_after_1s')}")
+        if saved:
+            print("Saved outputs:")
+            for p in saved:
+                print(f" - {p}")
+        return 0
     except Exception:
-        print('MuJoCo phase-7 run failed. Full traceback below:')
+        print("MuJoCo phase-10 run failed. Full traceback below:")
         traceback.print_exc()
-        raise
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

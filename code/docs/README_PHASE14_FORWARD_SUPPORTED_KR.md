@@ -17,12 +17,12 @@ trunk support wrench에 **x-target tracking + 작은 forward bias**를 추가한
 
 실시간 보기:
 ```bash
-python runner_mujoco_phase14_forward_supported_visual.py   --model ./mujoco_menagerie/unitree_a1/scene.xml   --scenario straight_trot   --output-dir outputs_mujoco_phase14/live_view   --disable-nonfoot-collision   --support-enabled
+python phases/runner_mujoco_phase14_forward_supported_visual.py   --model ./mujoco_menagerie/unitree_a1/scene.xml   --scenario straight_trot   --output-dir local_outputs/outputs_mujoco_phase14/live_view   --disable-nonfoot-collision   --support-enabled
 ```
 
 조금 더 앞으로 끌기:
 ```bash
-python runner_mujoco_phase14_forward_supported_visual.py   --model ./mujoco_menagerie/unitree_a1/scene.xml   --scenario straight_trot   --output-dir outputs_mujoco_phase14/live_view_push   --disable-nonfoot-collision   --support-enabled   --support-weight-frac 0.90   --support-target-height 0.31   --support-x-k 45   --support-forward-bias 5.0   --step-len-front 0.020   --rear-step-scale 0.60
+python phases/runner_mujoco_phase14_forward_supported_visual.py   --model ./mujoco_menagerie/unitree_a1/scene.xml   --scenario straight_trot   --output-dir local_outputs/outputs_mujoco_phase14/live_view_push   --disable-nonfoot-collision   --support-enabled   --support-weight-frac 0.90   --support-target-height 0.31   --support-x-k 45   --support-forward-bias 5.0   --step-len-front 0.020   --rear-step-scale 0.60
 ```
 
 만약 코가 아래로 숙여지면:

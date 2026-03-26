@@ -24,20 +24,20 @@ pip install -r requirements_mujoco_phase13_visual.txt
 
 ## 가장 먼저 권장하는 live 보기
 ```bash
-python runner_mujoco_phase13_supported_visual.py \
+python phases/runner_mujoco_phase13_supported_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase13/live_view \
+  --output-dir local_outputs/outputs_mujoco_phase13/live_view \
   --disable-nonfoot-collision \
   --support-enabled
 ```
 
 ## 더 보수적인 시작
 ```bash
-python runner_mujoco_phase13_supported_visual.py \
+python phases/runner_mujoco_phase13_supported_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase13/live_view_safe \
+  --output-dir local_outputs/outputs_mujoco_phase13/live_view_safe \
   --disable-nonfoot-collision \
   --support-enabled \
   --settle-time 1.2 \
@@ -51,14 +51,14 @@ python runner_mujoco_phase13_supported_visual.py \
 
 ## MP4 저장
 ```bash
-python runner_mujoco_phase13_supported_visual.py \
+python phases/runner_mujoco_phase13_supported_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase13/mp4_run \
+  --output-dir local_outputs/outputs_mujoco_phase13/mp4_run \
   --disable-nonfoot-collision \
   --support-enabled \
-  --save-mp4 outputs_mujoco_phase13/mp4_run/phase13.mp4
+  --save-mp4 local_outputs/outputs_mujoco_phase13/mp4_run/phase13.mp4
 ```
 
 ## 요점

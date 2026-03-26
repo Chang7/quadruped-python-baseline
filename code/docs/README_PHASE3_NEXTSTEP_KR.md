@@ -21,29 +21,29 @@
 
 ```bash
 source .venv/bin/activate
-python runner_mujoco_phase3.py \
+python phases/runner_mujoco_phase3.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase3/straight_default
+  --output-dir local_outputs/outputs_mujoco_phase3/straight_default
 ```
 
 파라미터 스윕 예시:
 
 ```bash
-python runner_mujoco_phase3.py \
+python phases/runner_mujoco_phase3.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase3/c050_s060 \
+  --output-dir local_outputs/outputs_mujoco_phase3/c050_s060 \
   --clearance 0.05 \
   --step-len 0.06
 
-python runner_mujoco_phase3.py \
+python phases/runner_mujoco_phase3.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase3/c060_s080 \
+  --output-dir local_outputs/outputs_mujoco_phase3/c060_s080 \
   --clearance 0.06 \
   --step-len 0.08
 ```

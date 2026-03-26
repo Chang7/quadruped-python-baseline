@@ -1,7 +1,15 @@
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import mujoco
 import numpy as np
 
-m = mujoco.MjModel.from_xml_path("./mujoco_menagerie/unitree_a1/scene.xml")
+MODEL_PATH = Path(__file__).resolve().parents[1] / "mujoco_menagerie" / "unitree_a1" / "scene.xml"
+
+m = mujoco.MjModel.from_xml_path(str(MODEL_PATH))
 
 legs = ["FR", "FL", "RR", "RL"]
 for leg in legs:

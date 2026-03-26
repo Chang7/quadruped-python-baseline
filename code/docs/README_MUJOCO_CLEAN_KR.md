@@ -5,7 +5,7 @@
 **high-level MPC core는 유지하고 low-level realization만 깨끗하게 다시 쓰는 버전**이다.
 
 ## 들어있는 파일
-- `run_mujoco_clean.py`
+- `experiments/run_mujoco_clean.py`
 - `low_level_realizer.py`
 - `mujoco_clean_visual.py`
 - `requirements_mujoco_clean.txt`
@@ -27,18 +27,18 @@ pip install -r requirements_mujoco_clean.txt
 
 ## 기본 실행
 ```bash
-python run_mujoco_clean.py \
+python experiments/run_mujoco_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_clean/live \
+  --output-dir local_outputs/outputs_mujoco_clean/live \
   --disable-nonfoot-collision \
   --support-enabled
 ```
 
 ## 발을 더 보이게 움직이는 버전
 ```bash
-python run_mujoco_clean.py \
+python experiments/run_mujoco_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_clean/push \
+  --output-dir local_outputs/outputs_mujoco_clean/push \
   --disable-nonfoot-collision \
   --support-enabled \
   --settle-time 0.5 \
@@ -52,21 +52,21 @@ python run_mujoco_clean.py \
 
 ## MP4 저장
 ```bash
-python run_mujoco_clean.py \
+python experiments/run_mujoco_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --headless \
-  --output-dir outputs_mujoco_clean/mp4 \
+  --output-dir local_outputs/outputs_mujoco_clean/mp4 \
   --disable-nonfoot-collision \
   --support-enabled \
-  --save-mp4 outputs_mujoco_clean/mp4/clean.mp4
+  --save-mp4 local_outputs/outputs_mujoco_clean/mp4/clean.mp4
 ```
 
 ## 추천 시작점
 ### 안정성 우선
 ```bash
-python run_mujoco_clean.py \
+python experiments/run_mujoco_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_clean/stable \
+  --output-dir local_outputs/outputs_mujoco_clean/stable \
   --disable-nonfoot-collision \
   --support-enabled \
   --settle-time 0.7 \
@@ -80,9 +80,9 @@ python run_mujoco_clean.py \
 
 ### 발이 보이게 움직이는 쪽
 ```bash
-python run_mujoco_clean.py \
+python experiments/run_mujoco_clean.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_clean/visible_steps \
+  --output-dir local_outputs/outputs_mujoco_clean/visible_steps \
   --disable-nonfoot-collision \
   --support-enabled \
   --settle-time 0.45 \

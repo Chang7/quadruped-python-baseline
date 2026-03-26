@@ -8,40 +8,40 @@
 
 ### 1) 기준점: no-latch + 기존 힘 그대로
 ```bash
-python runner_mujoco_phase6.py \
+python phases/runner_mujoco_phase6.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase6/baseline
+  --output-dir local_outputs/outputs_mujoco_phase6/baseline
 ```
 
 ### 2) 수평 힘 제거 테스트
 ```bash
-python runner_mujoco_phase6.py \
+python phases/runner_mujoco_phase6.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase6/zero_tangent \
+  --output-dir local_outputs/outputs_mujoco_phase6/zero_tangent \
   --zero-tangential
 ```
 
 ### 3) x-force 부호 뒤집기 테스트
 ```bash
-python runner_mujoco_phase6.py \
+python phases/runner_mujoco_phase6.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase6/flip_fx \
+  --output-dir local_outputs/outputs_mujoco_phase6/flip_fx \
   --fx-scale -1.0
 ```
 
 ### 4) body-frame -> world-frame 회전 테스트
 ```bash
-python runner_mujoco_phase6.py \
+python phases/runner_mujoco_phase6.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase6/body_frame \
+  --output-dir local_outputs/outputs_mujoco_phase6/body_frame \
   --force-frame body
 ```
 

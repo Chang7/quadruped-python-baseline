@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
 MODEL="./mujoco_menagerie/unitree_a1/scene.xml"
 
 # 1) Standing/support diagnostic: no forward demand, long settle.
-python runner_mujoco_phase12_crawl_visual.py \
+python phases/runner_mujoco_phase12_crawl_visual.py \
   --model "$MODEL" \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase12/stand_diag \
+  --output-dir local_outputs/outputs_mujoco_phase12/stand_diag \
   --disable-nonfoot-collision \
   --settle-time 2.0 \
   --gait-ramp-time 3.0 \
@@ -29,10 +32,10 @@ python runner_mujoco_phase12_crawl_visual.py \
   --mpc-load-gain 0.10
 
 # 2) Conservative front-support crawl.
-python runner_mujoco_phase12_crawl_visual.py \
+python phases/runner_mujoco_phase12_crawl_visual.py \
   --model "$MODEL" \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase12/front_support_crawl \
+  --output-dir local_outputs/outputs_mujoco_phase12/front_support_crawl \
   --disable-nonfoot-collision \
   --settle-time 1.4 \
   --gait-ramp-time 2.4 \

@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import traceback
 from pathlib import Path
@@ -15,7 +21,8 @@ from baseline.model import build_prediction_model
 from baseline.qp_builder import build_qp
 from baseline.controller_osqp import MPCControllerOSQP
 from baseline.plotting import plot_logs
-from phases.mujoco_phase2_helpers import (
+from phases.mujoco_phase3_helpers import (
+    FALLBACK_FOOT_LOCAL_OFFSET,
     discover_model_bindings,
     foot_point_world,
     foot_rel_world,
@@ -23,28 +30,21 @@ from phases.mujoco_phase2_helpers import (
     force_to_qfrc,
     actual_contact_state,
     store_home_joint_qpos,
-    store_swing_lift_dirs,
-    build_ctrl_targets_with_cfg,
+    compute_swing_delta_maps,
+    resolve_home_ctrl,
+    update_swing_anchors,
+    build_ctrl_targets_phase3,
     print_binding_summary,
 )
 
-FALLBACK_FOOT_LOCAL_OFFSET = np.array([0.0, 0.0, -0.20], dtype=float)
 
-
-def resolve_home_ctrl(m: mujoco.MjModel, d: mujoco.MjData) -> np.ndarray:
-    if m.nu == 0:
-        return np.zeros(0, dtype=float)
-    if d.qpos.shape[0] >= 7 + m.nu:
-        return np.asarray(d.qpos[7 : 7 + m.nu], dtype=float).copy()
-    return np.asarray(d.ctrl, dtype=float).copy()
-
-
-def run_mujoco_phase2(
+def run_mujoco_phase3(
     cfg,
     model_path: str,
     viewer: bool = True,
     output_dir: str | None = None,
-    swing_amp: float = 0.34,
+    clearance: float = 0.05,
+    step_len: float | None = None,
 ) -> tuple[dict, list[str]]:
     controller = MPCControllerOSQP(verbose=False)
 
@@ -64,12 +64,16 @@ def run_mujoco_phase2(
     mujoco.mj_kinematics(m, d)
     mujoco.mj_comPos(m, d)
     store_home_joint_qpos(d, bindings)
-    store_swing_lift_dirs(m, d, bindings, FALLBACK_FOOT_LOCAL_OFFSET)
+    compute_swing_delta_maps(m, d, bindings)
 
     next_mpc_time = 0.0
     u_hold = np.zeros(cfg.nu, dtype=float)
     x_ref0_hold = np.zeros(cfg.nx, dtype=float)
     scheduled_contact_hold = np.zeros(4, dtype=bool)
+    prev_sched = np.ones(4, dtype=bool)
+
+    if step_len is None:
+        step_len = max(0.03, min(0.10, 0.55 * cfg.desired_speed * cfg.swing_time))
 
     log = {
         "t": [],
@@ -81,7 +85,7 @@ def run_mujoco_phase2(
     }
 
     def one_step() -> bool:
-        nonlocal next_mpc_time, u_hold, x_ref0_hold, scheduled_contact_hold
+        nonlocal next_mpc_time, u_hold, x_ref0_hold, scheduled_contact_hold, prev_sched
 
         mujoco.mj_kinematics(m, d)
         mujoco.mj_comPos(m, d)
@@ -107,14 +111,18 @@ def run_mujoco_phase2(
             scheduled_contact_hold = contact_schedule[0].copy()
             next_mpc_time += cfg.dt_mpc
 
+        update_swing_anchors(d, bindings, prev_sched, scheduled_contact_hold)
+
         if m.nu > 0:
-            d.ctrl[:] = build_ctrl_targets_with_cfg(
+            d.ctrl[:] = build_ctrl_targets_phase3(
+                m=m,
                 d=d,
                 bindings=bindings,
                 home_ctrl=home_ctrl,
                 scheduled_contact=scheduled_contact_hold,
-                swing_amp=swing_amp,
                 cfg=cfg,
+                clearance=clearance,
+                step_len=step_len,
             )
 
         d.qfrc_applied[:] = 0.0
@@ -126,6 +134,7 @@ def run_mujoco_phase2(
             d.qfrc_applied[:] += force_to_qfrc(m, d, binding.calf_body_name, point_world, f_world)
 
         mujoco.mj_step(m, d)
+        prev_sched = scheduled_contact_hold.copy()
 
         x_now = mujoco_to_x(d, cfg, bindings.base_body_name)
         contact_actual = actual_contact_state(m, d, bindings)
@@ -162,11 +171,12 @@ def run_mujoco_phase2(
         print("Contact mismatch ratio per leg [FL, FR, RL, RR]:", np.round(mismatch, 3))
         print("Mean mismatch ratio:", float(np.mean(mismatch)))
 
+    print(f"Phase-3 params: clearance={clearance:.3f} m, step_len={step_len:.3f} m")
     return log, saved
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MuJoCo phase-2 baseline: foot-only contact diagnostics + actual foot point wrench application")
+    parser = argparse.ArgumentParser(description="MuJoCo phase-3 baseline: swing anchor + Jacobian-based foot-space swing arc")
     parser.add_argument("--scenario", default="straight_trot", choices=["straight_trot", "turn_pi_over_4"])
     parser.add_argument(
         "--model",
@@ -175,25 +185,27 @@ if __name__ == "__main__":
     )
     parser.add_argument("--headless", action="store_true", help="Run without opening the MuJoCo viewer")
     parser.add_argument("--output-dir", default=None, help="Directory for saved plots")
-    parser.add_argument("--swing-amp", type=float, default=0.34, help="Joint-space swing-lift target amplitude")
+    parser.add_argument("--clearance", type=float, default=0.05, help="Swing foot clearance [m]")
+    parser.add_argument("--step-len", type=float, default=None, help="Swing foot forward placement [m]")
     args = parser.parse_args()
 
     try:
         cfg = make_config(args.scenario)
-        outdir = args.output_dir or f"outputs_mujoco_phase2/{args.scenario}"
-        _, saved = run_mujoco_phase2(
+        outdir = args.output_dir or f"local_outputs/outputs_mujoco_phase3/{args.scenario}"
+        _, saved = run_mujoco_phase3(
             cfg,
             model_path=args.model,
             viewer=not args.headless,
             output_dir=outdir,
-            swing_amp=args.swing_amp,
+            clearance=args.clearance,
+            step_len=args.step_len,
         )
-        print(f"MuJoCo phase-2 run finished for scenario: {args.scenario}")
+        print(f"MuJoCo phase-3 run finished for scenario: {args.scenario}")
         print(f"Model: {Path(args.model).resolve()}")
         if saved:
             print("Saved figures:")
             for p in saved:
                 print(f" - {p}")
     except Exception:
-        print("MuJoCo phase-2 run failed. Full traceback below:")
+        print("MuJoCo phase-3 run failed. Full traceback below:")
         traceback.print_exc()

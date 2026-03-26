@@ -22,33 +22,33 @@
 ## 추천 실행
 실시간 보기:
 ```bash
-python runner_mujoco_phase11_stabilized_visual.py \
+python phases/runner_mujoco_phase11_stabilized_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
-  --output-dir outputs_mujoco_phase11/live_view \
+  --output-dir local_outputs/outputs_mujoco_phase11/live_view \
   --disable-nonfoot-collision
 ```
 
 GIF 저장:
 ```bash
-python runner_mujoco_phase11_stabilized_visual.py \
+python phases/runner_mujoco_phase11_stabilized_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase11/gif_run \
+  --output-dir local_outputs/outputs_mujoco_phase11/gif_run \
   --disable-nonfoot-collision \
-  --save-gif outputs_mujoco_phase11/gif_run/phase11.gif
+  --save-gif local_outputs/outputs_mujoco_phase11/gif_run/phase11.gif
 ```
 
 MP4 저장:
 ```bash
-python runner_mujoco_phase11_stabilized_visual.py \
+python phases/runner_mujoco_phase11_stabilized_visual.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase11/mp4_run \
+  --output-dir local_outputs/outputs_mujoco_phase11/mp4_run \
   --disable-nonfoot-collision \
-  --save-mp4 outputs_mujoco_phase11/mp4_run/phase11.mp4
+  --save-mp4 local_outputs/outputs_mujoco_phase11/mp4_run/phase11.mp4
 ```
 
 ## 처음 만져볼 파라미터

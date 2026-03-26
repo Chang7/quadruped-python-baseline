@@ -23,7 +23,7 @@
 ```bash
 cd /mnt/c/Users/<YOUR_NAME>/quadruped-python-baseline/code
 source .venv/bin/activate
-python runner_mujoco_phase1.py \
+python phases/runner_mujoco_phase1.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot
 ```
@@ -31,11 +31,11 @@ python runner_mujoco_phase1.py \
 headless:
 
 ```bash
-python runner_mujoco_phase1.py \
+python phases/runner_mujoco_phase1.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase1/straight_trot
+  --output-dir local_outputs/outputs_mujoco_phase1/straight_trot
 ```
 
 ## 새로 생기는 그림

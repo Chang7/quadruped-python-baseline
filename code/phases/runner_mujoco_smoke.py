@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import traceback
 from pathlib import Path
@@ -172,7 +178,7 @@ if __name__ == "__main__":
 
     try:
         cfg = make_config(args.scenario)
-        outdir = args.output_dir or f"outputs_mujoco/{args.scenario}"
+        outdir = args.output_dir or f"local_outputs/outputs_mujoco/{args.scenario}"
         _, saved = run_mujoco(cfg, model_path=args.model, viewer=not args.headless, output_dir=outdir)
         print(f"MuJoCo run finished for scenario: {args.scenario}")
         print(f"Model: {Path(args.model).resolve()}")

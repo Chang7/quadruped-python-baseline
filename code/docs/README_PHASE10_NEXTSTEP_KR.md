@@ -17,11 +17,11 @@ phase-10은 이 가설을 직접 실험하기 위한 patch입니다.
 ## 권장 실행
 ### 1) foot-only collision + external realization 기준점
 ```bash
-python runner_mujoco_phase10.py \
+python phases/runner_mujoco_phase10.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10/foot_only_bias_default \
+  --output-dir local_outputs/outputs_mujoco_phase10/foot_only_bias_default \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision
@@ -29,11 +29,11 @@ python runner_mujoco_phase10.py \
 
 ### 2) 더 강한 rear press/back
 ```bash
-python runner_mujoco_phase10.py \
+python phases/runner_mujoco_phase10.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --scenario straight_trot \
   --headless \
-  --output-dir outputs_mujoco_phase10/foot_only_bias_stronger \
+  --output-dir local_outputs/outputs_mujoco_phase10/foot_only_bias_stronger \
   --realization external \
   --force-frame body \
   --disable-nonfoot-collision \

@@ -1,5 +1,10 @@
-
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import argparse
 import traceback
@@ -235,7 +240,7 @@ if __name__ == "__main__":
 
     try:
         cfg = make_config(args.scenario)
-        outdir = args.output_dir or f"outputs_mujoco_phase4/{args.scenario}"
+        outdir = args.output_dir or f"local_outputs/outputs_mujoco_phase4/{args.scenario}"
         _, saved, _ = run_mujoco_phase4(
             cfg,
             model_path=args.model,

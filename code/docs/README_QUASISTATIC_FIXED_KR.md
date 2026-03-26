@@ -12,7 +12,7 @@
 - recovery 중 body target을 약간 forward로 잡아 뒤로 주저앉는 경향을 줄임
 
 ## 필요한 파일
-- `run_mujoco_quasistatic_fixed.py`
+- `experiments/run_mujoco_quasistatic_fixed.py`
 - `quasistatic_confirmed_helper_fixed.py`
 
 기존 code 폴더에 아래 파일들이 이미 있어야 합니다.
@@ -28,18 +28,18 @@
 ## 권장 실행
 기본:
 ```bash
-python run_mujoco_quasistatic_fixed.py \
+python experiments/run_mujoco_quasistatic_fixed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_quasistatic_fixed/live \
+  --output-dir local_outputs/outputs_mujoco_quasistatic_fixed/live \
   --disable-nonfoot-collision \
   --support-enabled
 ```
 
 발이 더 보이게 움직이는 버전:
 ```bash
-python run_mujoco_quasistatic_fixed.py \
+python experiments/run_mujoco_quasistatic_fixed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
-  --output-dir outputs_mujoco_quasistatic_fixed/visible \
+  --output-dir local_outputs/outputs_mujoco_quasistatic_fixed/visible \
   --disable-nonfoot-collision \
   --support-enabled \
   --visual-step-boost 1.25 \
@@ -52,13 +52,13 @@ python run_mujoco_quasistatic_fixed.py \
 
 headless mp4:
 ```bash
-python run_mujoco_quasistatic_fixed.py \
+python experiments/run_mujoco_quasistatic_fixed.py \
   --model ./mujoco_menagerie/unitree_a1/scene.xml \
   --headless \
-  --output-dir outputs_mujoco_quasistatic_fixed/mp4 \
+  --output-dir local_outputs/outputs_mujoco_quasistatic_fixed/mp4 \
   --disable-nonfoot-collision \
   --support-enabled \
-  --save-mp4 outputs_mujoco_quasistatic_fixed/mp4/fixed.mp4
+  --save-mp4 local_outputs/outputs_mujoco_quasistatic_fixed/mp4/fixed.mp4
 ```
 
 ## 이번 버전에서 봐야 할 것

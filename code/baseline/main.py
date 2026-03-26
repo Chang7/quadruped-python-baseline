@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import traceback
 import numpy as np
@@ -77,7 +83,7 @@ if __name__ == "__main__":
     try:
         cfg = make_config(args.scenario)
         logs = run_simulation(cfg)
-        saved = plot_logs(logs, cfg, output_dir=f"outputs/{args.scenario}")
+        saved = plot_logs(logs, cfg, output_dir=f"local_outputs/outputs/{args.scenario}")
         print(f"Simulation finished for scenario: {args.scenario}")
         print("Saved figures:")
         for path in saved:

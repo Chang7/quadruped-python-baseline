@@ -1,28 +1,30 @@
 # Code Folder Index
 
-This folder is organized so that runner entrypoints stay easy to spot at the root, while shared logic is grouped by purpose.
+This folder is organized so that shared logic is grouped by purpose and runnable entrypoints live next to the modules they belong to.
 
-## Root Entry Points
+## Entry Points
 
-- `runner_mujoco_phase1.py` to `runner_mujoco_phase14_forward_supported_visual.py`
-- `runner_mujoco_smoke.py`
-- `run_mujoco_clean.py`
-- `run_mujoco_adaptive_clean.py`
-- `run_mujoco_quasistatic_confirmed.py`
-- `run_mujoco_quasistatic_fixed.py`
-- `run_mujoco_quasistatic_heightfix.py`
-- `main.py`
+- `phases/runner_mujoco_phase1.py` to `phases/runner_mujoco_phase14_forward_supported_visual.py`
+- `phases/runner_mujoco_smoke.py`
+- `experiments/run_mujoco_clean.py`
+- `experiments/run_mujoco_adaptive_clean.py`
+- `experiments/run_mujoco_quasistatic_confirmed.py`
+- `experiments/run_mujoco_quasistatic_fixed.py`
+- `experiments/run_mujoco_quasistatic_heightfix.py`
+- `baseline/main.py`
 
 ## Folders
 
 - `baseline/`: shared baseline MPC code such as config, model, reference, QP build, plotting
 - `phases/`: MuJoCo phase helper modules and visual utilities
 - `experiments/`: quasistatic / clean / adaptive helper modules
+- `scripts/`: setup and convenience shell / PowerShell scripts
+- `tools/`: one-off inspection utilities
 - `docs/`: phase notes and Korean walkthrough documents
 - `requirements/`: pip requirement files
 
 ## Notes
 
-- Generated result folders such as `outputs_mujoco_phase*` are runtime artifacts.
+- Generated result folders such as `local_outputs/outputs_mujoco_phase*` are runtime artifacts.
 - `mujoco_menagerie/` and `.venv/` are environment assets, not core source files.
-- If you run a root runner script directly, the new package layout is already reflected in imports.
+- Entry scripts inside `baseline/`, `phases/`, `experiments/`, and `tools/` include a direct-run path fallback.
