@@ -17,6 +17,15 @@ The main remaining bottleneck is not the QP solve alone, but how the planned
 forces are carried through contact transition and load transfer, especially
 during rear touchdown/recontact.
 
+## Current Status
+
+- The stock MuJoCo integration stack is stable in the reference scenarios used
+  here.
+- The current `linear_osqp` path no longer shows the earlier immediate collapse
+  in short-horizon `trot` tests.
+- The main remaining gap is still in contact transition quality, especially
+  rear touchdown/recontact and post-touchdown stabilization in `crawl`.
+
 ## Repository Layout
 
 ### Active Code
@@ -71,6 +80,31 @@ Run the custom backend in MuJoCo:
 ```bash
 python -m simulation.run_linear_osqp --gait crawl --controller linear_osqp --seconds 10
 ```
+
+## Quick Reproduction
+
+Short stock `trot` reference:
+
+```bash
+python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_stock_sampling_trot
+```
+
+Short custom `linear_osqp` `trot`:
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
+```
+
+Current `crawl` diagnostic:
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl
+```
+
+The main contact-transition logic is currently concentrated in:
+
+- `quadruped_pympc/interfaces/wb_interface.py`
+- `simulation/run_linear_osqp.py`
 
 ## Recommended Reading Order
 
