@@ -1,0 +1,9 @@
+# Baseline
+python runners/run_python_baseline.py --scenario straight_trot
+python runners/run_python_baseline.py --scenario turn_pi_over_4
+
+# MuJoCo live
+python runners/run_mujoco_quasistatic.py --model ./mujoco_menagerie/unitree_a1/scene.xml --support-enabled --disable-nonfoot-collision
+
+# MuJoCo MP4
+python runners/run_mujoco_quasistatic.py --model ./mujoco_menagerie/unitree_a1/scene.xml --headless --support-enabled --disable-nonfoot-collision --save-mp4 outputs/mujoco/quasistatic.mp4

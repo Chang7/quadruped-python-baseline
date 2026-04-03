@@ -12,6 +12,15 @@ These are the folders to modify for ongoing work:
 - `pyproject.toml`
 - `LINEAR_OSQP_README.md`
 
+## Legacy Code
+
+Older standalone code is preserved separately under:
+
+- `legacy/python_baseline/`
+
+This keeps the earlier baseline readable without mixing it into the current
+stock-stack adapter tree.
+
 ## Outputs
 
 All new generated artifacts should go under:

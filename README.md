@@ -25,6 +25,14 @@ during rear touchdown/recontact.
 - `simulation/`
 - `tools/`
 
+### Legacy Baseline
+
+- `legacy/python_baseline/`
+  - preserved copy of the earlier standalone Python baseline and MuJoCo
+    prototype code
+  - kept separately so the original baseline work is still readable without
+    mixing it into the current stock-stack adapter tree
+
 ### Outputs
 
 - `outputs/curated_runs/`
@@ -70,6 +78,7 @@ python -m simulation.run_linear_osqp --gait crawl --controller linear_osqp --sec
 2. `LINEAR_OSQP_README.md`
 3. `outputs/README.md`
 4. `outputs/report_progress_explainer/README.md`
+5. `legacy/python_baseline/README.md`
 
 ## Notes
 
