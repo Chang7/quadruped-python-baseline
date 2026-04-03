@@ -8,9 +8,13 @@ short report summaries.
 - `crawl_same_scenario/`
   - Main email-ready diagnostic comparison.
   - Use this when explaining rear touchdown/recontact and load transfer.
+- `trot_stable_compare/`
+  - Current email-ready trot proof package.
+  - Use this when showing that the present `linear_osqp` branch completes the
+    short trot scenario without early collapse.
 - `trot_same_scenario/`
-  - Harsher same-scenario comparison for objective follow-up checks.
-  - Useful for internal review, but the linear result is much shorter-lived.
+  - Older same-scenario comparison from the earlier failing trot stage.
+  - Keep for traceability only; it is no longer the preferred trot asset set.
 - `quadruped_mpc_progress_update.docx`
   - Convenience document version of the current progress summary.
 

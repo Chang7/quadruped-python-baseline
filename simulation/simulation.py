@@ -87,6 +87,35 @@ def _close_mujoco_video(video_state):
     return video_state["path"]
 
 
+def _apply_contact_overrides(model, simulation_params) -> None:
+    if simulation_params is None:
+        return
+
+    condim_override = simulation_params.get("contact_condim_override", None)
+    impratio_override = simulation_params.get("contact_impratio_override", None)
+    torsional_override = simulation_params.get("contact_torsional_friction_override", None)
+    rolling_override = simulation_params.get("contact_rolling_friction_override", None)
+
+    if condim_override is None and impratio_override is None and torsional_override is None and rolling_override is None:
+        return
+
+    if impratio_override is not None:
+        model.opt.impratio = max(float(impratio_override), 1.0)
+
+    target_geoms = {"floor", "FL", "FR", "RL", "RR"}
+    for geom_id in range(int(model.ngeom)):
+        geom = model.geom(geom_id)
+        name = (getattr(geom, "name", "") or "").strip()
+        if name not in target_geoms:
+            continue
+        if condim_override is not None:
+            model.geom_condim[geom_id] = int(condim_override)
+        if torsional_override is not None:
+            model.geom_friction[geom_id, 1] = max(float(torsional_override), 0.0)
+        if rolling_override is not None:
+            model.geom_friction[geom_id, 2] = max(float(rolling_override), 0.0)
+
+
 def run_simulation(
     qpympc_cfg,
     process=0,
@@ -130,6 +159,7 @@ def run_simulation(
     )
     pprint(env.get_hyperparameters())
     env.mjModel.opt.gravity[2] = -qpympc_cfg.gravity_constant
+    _apply_contact_overrides(env.mjModel, qpympc_cfg.simulation_params)
 
     fixed_ref_base_lin_vel = None
     if controller_ref_base_lin_vel is not None:
@@ -185,6 +215,8 @@ def run_simulation(
         "ref_base_height",
         "ref_base_angles",
         "ref_feet_pos",
+        "des_foot_pos",
+        "des_foot_vel",
         "nmpc_GRFs",
         "nmpc_footholds",
         "swing_time",
@@ -192,6 +224,7 @@ def run_simulation(
         "lift_off_positions",
         "planned_contact",
         "current_contact",
+        "swing_contact_release_active",
         "latched_release_alpha",
         "latched_swing_time",
         "support_margin",
@@ -207,6 +240,7 @@ def run_simulation(
         "touchdown_support_alpha",
         "rear_handoff_support_active",
         "rear_swing_bridge_active",
+        "rear_swing_release_support_active",
         "full_contact_recovery_active",
         "full_contact_recovery_alpha",
         "gate_forward_scale",
@@ -295,6 +329,14 @@ def run_simulation(
             legs_qfrc_passive = env.legs_qfrc_passive
             feet_jac = env.feet_jacobians(frame='world', return_rot_jac=False)
             feet_jac_dot = env.feet_jacobians_dot(frame='world', return_rot_jac=False)
+            try:
+                foot_contact_state_now, _, foot_grf_state_now = env.feet_contact_state(ground_reaction_forces=True)
+            except Exception:
+                foot_grf_state_now = None
+                try:
+                    foot_contact_state_now, _ = env.feet_contact_state()
+                except Exception:
+                    foot_contact_state_now = None
 
             tau = quadrupedpympc_wrapper.compute_actions(
                 com_pos,
@@ -324,6 +366,8 @@ def run_simulation(
                 tau,
                 inertia,
                 env.mjData.contact,
+                foot_contact_state_now,
+                foot_grf_state_now,
             )
             for leg in ["FL", "FR", "RL", "RR"]:
                 tau_min, tau_max = tau_limits[leg][:, 0], tau_limits[leg][:, 1]

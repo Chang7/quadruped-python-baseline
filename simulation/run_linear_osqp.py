@@ -88,22 +88,43 @@ def main() -> None:
     parser.add_argument("--front-late-release-roll-guard", type=float, default=None, help="Optional abs roll limit in radians for opening the front-only late-release path.")
     parser.add_argument("--touchdown-reacquire-hold-s", type=float, default=None, help="Keep controller-side swing briefly after planned touchdown if the foot still has no actual contact.")
     parser.add_argument("--front-touchdown-reacquire-hold-s", type=float, default=None, help="Optional front-leg override for post-swing touchdown reacquire hold.")
+    parser.add_argument("--rear-touchdown-reacquire-hold-s", type=float, default=None, help="Optional rear-leg override for post-swing touchdown reacquire hold.")
     parser.add_argument("--touchdown-reacquire-forward-scale", type=float, default=None, help="Scale forward reference velocity while waiting for actual touchdown reacquire.")
     parser.add_argument("--touchdown-reacquire-xy-blend", type=float, default=None, help="Blend touchdown reacquire target xy toward the stored touchdown position.")
     parser.add_argument("--front-touchdown-reacquire-xy-blend", type=float, default=None, help="Optional front-leg override for touchdown reacquire xy blend.")
+    parser.add_argument("--rear-touchdown-reacquire-xy-blend", type=float, default=None, help="Optional rear-leg override for touchdown reacquire xy blend.")
     parser.add_argument("--touchdown-reacquire-extra-depth", type=float, default=None, help="Lower the touchdown reacquire target below the nominal touchdown height.")
     parser.add_argument("--front-touchdown-reacquire-extra-depth", type=float, default=None, help="Optional front-leg override for touchdown reacquire extra depth.")
+    parser.add_argument("--rear-touchdown-reacquire-extra-depth", type=float, default=None, help="Optional rear-leg override for touchdown reacquire extra depth.")
     parser.add_argument("--touchdown-reacquire-forward-bias", type=float, default=None, help="Add a forward x bias to the touchdown reacquire target.")
     parser.add_argument("--front-touchdown-reacquire-forward-bias", type=float, default=None, help="Optional front-leg override for touchdown reacquire forward bias.")
+    parser.add_argument("--rear-touchdown-reacquire-forward-bias", type=float, default=None, help="Optional rear-leg override for touchdown reacquire forward bias.")
+    parser.add_argument("--rear-touchdown-reacquire-force-until-contact", action="store_true", help="Keep rear controller-side swing active during planned stance until actual contact really returns.")
+    parser.add_argument("--rear-touchdown-reacquire-min-swing-time-s", type=float, default=None, help="Minimum rear swing time [s] before planned-stance reacquire support is allowed to take over.")
+    parser.add_argument("--front-touchdown-reacquire-hold-current-xy", action="store_true", help="During front touchdown reacquire, hold the current foot xy and search mainly downward instead of chasing the nominal foothold.")
+    parser.add_argument("--rear-touchdown-reacquire-hold-current-xy", action="store_true", help="During rear touchdown reacquire, hold the current foot xy and mainly search downward instead of chasing the nominal foothold.")
+    parser.add_argument("--rear-touchdown-reacquire-max-xy-shift", type=float, default=None, help="Cap how far a rear touchdown reacquire target may move from the current foot xy.")
+    parser.add_argument("--rear-touchdown-reacquire-min-phase", type=float, default=None, help="Minimum swing phase enforced during rear touchdown reacquire so the foot stays in the descent portion of swing.")
+    parser.add_argument("--rear-touchdown-reacquire-upward-vel-damping", type=float, default=None, help="Extra damping applied only to upward rear foot z velocity while waiting for actual recontact.")
+    parser.add_argument("--rear-touchdown-retry-descent-depth", type=float, default=None, help="Extra downward search depth used only after a rear false-close retry reopens swing.")
+    parser.add_argument("--rear-touchdown-retry-descent-kp", type=float, default=None, help="Vertical task-space stiffness used during rear false-close retry descent assist.")
+    parser.add_argument("--rear-touchdown-retry-descent-kd", type=float, default=None, help="Vertical task-space damping used during rear false-close retry descent assist.")
+    parser.add_argument("--rear-touchdown-contact-debounce-s", type=float, default=None, help="Require rear actual contact to persist this long before closing controller-side swing during force-until-contact.")
+    parser.add_argument("--rear-touchdown-contact-min-phase", type=float, default=None, help="Minimum rear swing phase required before controller-side rear contact may close during touchdown reacquire.")
+    parser.add_argument("--rear-touchdown-contact-max-upward-vel", type=float, default=None, help="Maximum allowed upward rear foot z velocity [m/s] before controller-side rear contact may close during touchdown reacquire.")
+    parser.add_argument("--rear-touchdown-contact-min-grf-z", type=float, default=None, help="Minimum upward world-frame GRF [N] required before rear touchdown is treated as truly load-bearing.")
     parser.add_argument("--stance-anchor-update-alpha", type=float, default=None, help="Relax stance touchdown anchors toward the actual contacted foot position every step.")
     parser.add_argument("--front-stance-anchor-update-alpha", type=float, default=None, help="Optional front-leg override for stance anchor update alpha.")
     parser.add_argument("--touchdown-support-anchor-update-alpha", type=float, default=None, help="Relax stance touchdown anchors toward the actual contacted foot position only while touchdown support is active.")
     parser.add_argument("--front-touchdown-support-anchor-update-alpha", type=float, default=None, help="Optional front-leg override for touchdown-support anchor update alpha.")
     parser.add_argument("--touchdown-confirm-hold-s", type=float, default=None, help="Keep a short confirmation window after actual touchdown returns.")
     parser.add_argument("--front-touchdown-confirm-hold-s", type=float, default=None, help="Optional front-leg override for touchdown confirmation hold.")
+    parser.add_argument("--rear-touchdown-confirm-hold-s", type=float, default=None, help="Optional rear-leg override for touchdown confirmation hold.")
+    parser.add_argument("--rear-touchdown-confirm-keep-swing", action="store_true", help="Keep rear controller-side swing active through the rear touchdown confirmation window so a flaky first contact does not reset swing.")
     parser.add_argument("--touchdown-confirm-forward-scale", type=float, default=None, help="Scale forward reference velocity during the touchdown confirmation window.")
     parser.add_argument("--touchdown-settle-hold-s", type=float, default=None, help="Keep a short post-touchdown settling window after actual contact comes back.")
     parser.add_argument("--front-touchdown-settle-hold-s", type=float, default=None, help="Optional front-leg override for the post-touchdown settling window.")
+    parser.add_argument("--rear-touchdown-settle-hold-s", type=float, default=None, help="Optional rear-leg override for the post-touchdown settling window.")
     parser.add_argument("--touchdown-settle-forward-scale", type=float, default=None, help="Scale forward reference velocity during the post-touchdown settling window.")
     parser.add_argument("--touchdown-support-rear-floor-delta", type=float, default=None, help="Temporarily increase rear-load floor while front touchdown confirm/settle is active.")
     parser.add_argument("--touchdown-support-vertical-boost", type=float, default=None, help="Temporarily increase reduced-support vertical boost while front touchdown confirm/settle is active.")
@@ -116,6 +137,19 @@ def main() -> None:
     parser.add_argument("--touchdown-support-rear-joint-pd-scale", type=float, default=None, help="Extra low-gain joint PD applied only on rear support legs while front touchdown confirm/settle is active.")
     parser.add_argument("--touchdown-support-anchor-xy-blend", type=float, default=None, help="Blend a front touchdown support leg's stance target toward the actual contacted foot xy location.")
     parser.add_argument("--touchdown-support-anchor-z-blend", type=float, default=None, help="Blend a front touchdown support leg's stance target height toward the actual contacted foot z location.")
+    parser.add_argument("--rear-touchdown-support-anchor-update-alpha", type=float, default=None, help="Relax rear stance anchors toward the actual foot only while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-support-floor-delta", type=float, default=None, help="Temporarily increase all-stance support floor while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-vertical-boost", type=float, default=None, help="Temporarily increase reduced-support vertical boost while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-z-pos-gain-delta", type=float, default=None, help="Temporarily increase base-height gain while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-roll-angle-gain-delta", type=float, default=None, help="Temporarily increase roll-angle gain while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-roll-rate-gain-delta", type=float, default=None, help="Temporarily increase roll-rate gain while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-pitch-angle-gain-delta", type=float, default=None, help="Temporarily increase pitch-angle gain while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-pitch-rate-gain-delta", type=float, default=None, help="Temporarily increase pitch-rate gain while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-side-rebalance-delta", type=float, default=None, help="Temporarily increase signed left/right load rebalance while rear touchdown support is active.")
+    parser.add_argument("--rear-touchdown-support-front-joint-pd-scale", type=float, default=None, help="Extra low-gain joint PD applied only on front support legs while rear touchdown support is active.")
+    parser.add_argument("--touchdown-contact-vel-z-damping", type=float, default=None, help="Task-space vertical damping applied during touchdown support windows.")
+    parser.add_argument("--front-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional front-leg override for touchdown support vertical damping.")
+    parser.add_argument("--rear-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional rear-leg override for touchdown support vertical damping.")
     parser.add_argument("--front-margin-rescue-hold-s", type=float, default=None, help="Keep a brief late front-leg support rescue alive during unstable full-contact stance.")
     parser.add_argument("--front-margin-rescue-forward-scale", type=float, default=None, help="Scale forward reference velocity while late front-margin rescue is active.")
     parser.add_argument("--front-margin-rescue-min-margin", type=float, default=None, help="Trigger late front-margin rescue when the queried front support margin falls below this value.")
@@ -171,6 +205,14 @@ def main() -> None:
     parser.add_argument("--front-support-contact-confirm-hold-s", type=float, default=None, help="Optional front-leg override for support-contact confirmation hold.")
     parser.add_argument("--rear-support-contact-confirm-hold-s", type=float, default=None, help="Optional rear-leg override for support-contact confirmation hold.")
     parser.add_argument("--support-confirm-forward-scale", type=float, default=None, help="Scale forward reference velocity while support-contact confirmation is still pending.")
+    parser.add_argument("--rear-swing-contact-release-timeout-s", type=float, default=None, help="Force a rear planned-swing leg open if physical contact persists longer than this timeout.")
+    parser.add_argument("--rear-swing-release-support-hold-s", type=float, default=None, help="Optional short support window after rear forced release; keep at zero unless explicitly testing it.")
+    parser.add_argument("--rear-swing-release-forward-scale", type=float, default=None, help="Forward-reference scale used only while rear forced-release support is active.")
+    parser.add_argument("--ground-friction", type=float, default=None, help="Optional fixed ground friction coefficient for MuJoCo.")
+    parser.add_argument("--contact-condim", type=int, default=None, help="Optional MuJoCo contact condim override for floor and foot geoms.")
+    parser.add_argument("--contact-impratio", type=float, default=None, help="Optional MuJoCo impratio override.")
+    parser.add_argument("--contact-torsional-friction", type=float, default=None, help="Optional torsional friction override for floor and foot geoms.")
+    parser.add_argument("--contact-rolling-friction", type=float, default=None, help="Optional rolling friction override for floor and foot geoms.")
     args = parser.parse_args()
 
     cfg.mpc_params["type"] = args.controller
@@ -182,7 +224,7 @@ def main() -> None:
 
     if hasattr(cfg, "linear_osqp_params"):
         if args.preset == "conservative":
-            cfg.linear_osqp_params.update({
+            conservative_params = {
                 "Q_p": 2e4,
                 "Q_v": 4e4,
                 "Q_theta": 2e4,
@@ -224,6 +266,7 @@ def main() -> None:
                 "rear_support_contact_confirm_hold_s": None,
                 "support_confirm_forward_scale": 1.0,
                 "front_stance_dropout_reacquire": True,
+                "rear_stance_dropout_reacquire": False,
                 "front_late_release_phase_threshold": 1.1,
                 "front_late_release_min_margin": None,
                 "front_late_release_hold_s": None,
@@ -234,20 +277,27 @@ def main() -> None:
                 "front_late_release_roll_guard": None,
                 "touchdown_reacquire_hold_s": 0.0,
                 "front_touchdown_reacquire_hold_s": None,
+                "rear_touchdown_reacquire_hold_s": None,
                 "touchdown_reacquire_forward_scale": 1.0,
                 "touchdown_reacquire_xy_blend": 0.0,
                 "front_touchdown_reacquire_xy_blend": None,
+                "rear_touchdown_reacquire_xy_blend": None,
                 "touchdown_reacquire_extra_depth": 0.0,
                 "front_touchdown_reacquire_extra_depth": None,
+                "rear_touchdown_reacquire_extra_depth": None,
                 "touchdown_reacquire_forward_bias": 0.0,
                 "front_touchdown_reacquire_forward_bias": None,
+                "rear_touchdown_reacquire_forward_bias": None,
                 "stance_anchor_update_alpha": 0.0,
                 "front_stance_anchor_update_alpha": None,
+                "rear_stance_anchor_update_alpha": None,
                 "touchdown_confirm_hold_s": 0.0,
                 "front_touchdown_confirm_hold_s": None,
+                "rear_touchdown_confirm_hold_s": None,
                 "touchdown_confirm_forward_scale": 1.0,
                 "touchdown_settle_hold_s": 0.0,
                 "front_touchdown_settle_hold_s": None,
+                "rear_touchdown_settle_hold_s": None,
                 "touchdown_settle_forward_scale": 1.0,
                 "touchdown_support_rear_floor_delta": 0.0,
                 "touchdown_support_vertical_boost": 0.0,
@@ -260,6 +310,18 @@ def main() -> None:
                 "touchdown_support_rear_joint_pd_scale": 0.0,
                 "touchdown_support_anchor_xy_blend": 0.0,
                 "touchdown_support_anchor_z_blend": 0.0,
+                "rear_touchdown_support_anchor_update_alpha": None,
+                "rear_touchdown_support_support_floor_delta": 0.0,
+                "rear_touchdown_support_vertical_boost": 0.0,
+                "rear_touchdown_support_z_pos_gain_delta": 0.0,
+                "rear_touchdown_support_roll_angle_gain_delta": 0.0,
+                "rear_touchdown_support_roll_rate_gain_delta": 0.0,
+                "rear_touchdown_support_pitch_angle_gain_delta": 0.0,
+                "rear_touchdown_support_pitch_rate_gain_delta": 0.0,
+                "rear_touchdown_support_side_rebalance_delta": 0.0,
+                "rear_touchdown_support_front_joint_pd_scale": 0.0,
+                "touchdown_contact_vel_z_damping": 0.0,
+                "rear_touchdown_contact_vel_z_damping": None,
                 "front_margin_rescue_hold_s": 0.0,
                 "front_margin_rescue_forward_scale": 1.0,
                 "front_margin_rescue_min_margin": 0.0,
@@ -311,7 +373,50 @@ def main() -> None:
                 "virtual_unlatch_phase_threshold": 1.1,
                 "virtual_unlatch_hold_s": 0.0,
                 "pre_swing_lookahead_steps": 3,
-            })
+            }
+            if args.gait == "crawl":
+                conservative_params = {}
+            if args.gait == "crawl":
+                # For crawl, the best current behavior comes from the stock
+                # linear_osqp defaults plus slower gait timing below. Heavier
+                # crawl-specific overrides regressed the branch and produced
+                # earlier trunk/front failures.
+                pass
+            if args.gait in {"trot", "pace", "bound"}:
+                conservative_params.update(
+                    {
+                        # Dynamic gaits need faster force build-up and much less
+                        # static support guarding than the crawl-oriented preset.
+                        "command_smoothing": 0.0,
+                        "fy_scale": 0.45,
+                        "dynamic_fy_roll_gain": 0.25,
+                        "dynamic_fy_roll_ref": 0.18,
+                        "grf_max_scale": 1.0,
+                        "stance_ramp_steps": 1,
+                        "joint_pd_scale": 0.15,
+                        "latched_joint_pd_scale": 0.15,
+                        "rear_floor_base_scale": 0.50,
+                        "rear_floor_pitch_gain": 0.0,
+                        "min_vertical_force_scale": 1.0,
+                        "reduced_support_vertical_boost": 0.30,
+                        "du_xy_max": 10.0,
+                        "du_z_max": 25.0,
+                        "side_rebalance_gain": 0.0,
+                        "side_rebalance_ref": 0.20,
+                        "pitch_rebalance_gain": 0.0,
+                        "pitch_angle_gain": 37.0,
+                        "pitch_rate_gain": 11.0,
+                        "pitch_rebalance_ref": 0.20,
+                        "pre_swing_gate_min_margin": 0.0,
+                        "front_pre_swing_gate_min_margin": 0.0,
+                        "rear_pre_swing_gate_min_margin": 0.0,
+                        "pre_swing_gate_hold_s": 0.0,
+                        "contact_latch_steps": 0,
+                        "contact_latch_budget_s": 0.0,
+                        "virtual_unlatch_hold_s": 0.0,
+                    }
+                )
+            cfg.linear_osqp_params.update(conservative_params)
         if args.q_p is not None:
             cfg.linear_osqp_params["Q_p"] = args.q_p
         if args.q_v is not None:
@@ -428,6 +533,8 @@ def main() -> None:
             cfg.linear_osqp_params["touchdown_reacquire_hold_s"] = max(float(args.touchdown_reacquire_hold_s), 0.0)
         if args.front_touchdown_reacquire_hold_s is not None:
             cfg.linear_osqp_params["front_touchdown_reacquire_hold_s"] = max(float(args.front_touchdown_reacquire_hold_s), 0.0)
+        if args.rear_touchdown_reacquire_hold_s is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_hold_s"] = max(float(args.rear_touchdown_reacquire_hold_s), 0.0)
         if args.touchdown_reacquire_forward_scale is not None:
             cfg.linear_osqp_params["touchdown_reacquire_forward_scale"] = float(
                 max(min(args.touchdown_reacquire_forward_scale, 1.0), 0.0)
@@ -440,6 +547,10 @@ def main() -> None:
             cfg.linear_osqp_params["front_touchdown_reacquire_xy_blend"] = float(
                 max(min(args.front_touchdown_reacquire_xy_blend, 1.0), 0.0)
             )
+        if args.rear_touchdown_reacquire_xy_blend is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_xy_blend"] = float(
+                max(min(args.rear_touchdown_reacquire_xy_blend, 1.0), 0.0)
+            )
         if args.touchdown_reacquire_extra_depth is not None:
             cfg.linear_osqp_params["touchdown_reacquire_extra_depth"] = max(float(args.touchdown_reacquire_extra_depth), 0.0)
         if args.front_touchdown_reacquire_extra_depth is not None:
@@ -447,10 +558,77 @@ def main() -> None:
                 float(args.front_touchdown_reacquire_extra_depth),
                 0.0,
             )
+        if args.rear_touchdown_reacquire_extra_depth is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_extra_depth"] = max(
+                float(args.rear_touchdown_reacquire_extra_depth),
+                0.0,
+            )
         if args.touchdown_reacquire_forward_bias is not None:
             cfg.linear_osqp_params["touchdown_reacquire_forward_bias"] = float(args.touchdown_reacquire_forward_bias)
         if args.front_touchdown_reacquire_forward_bias is not None:
             cfg.linear_osqp_params["front_touchdown_reacquire_forward_bias"] = float(args.front_touchdown_reacquire_forward_bias)
+        if args.rear_touchdown_reacquire_forward_bias is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_forward_bias"] = float(args.rear_touchdown_reacquire_forward_bias)
+        if args.rear_touchdown_reacquire_force_until_contact:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_force_until_contact"] = True
+        if args.rear_touchdown_reacquire_min_swing_time_s is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_min_swing_time_s"] = max(
+                float(args.rear_touchdown_reacquire_min_swing_time_s),
+                0.0,
+            )
+        if args.front_touchdown_reacquire_hold_current_xy:
+            cfg.linear_osqp_params["front_touchdown_reacquire_hold_current_xy"] = True
+        if args.rear_touchdown_reacquire_hold_current_xy:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_hold_current_xy"] = True
+        if args.rear_touchdown_reacquire_max_xy_shift is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_max_xy_shift"] = max(
+                float(args.rear_touchdown_reacquire_max_xy_shift),
+                0.0,
+            )
+        if args.rear_touchdown_reacquire_min_phase is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_min_phase"] = max(
+                min(float(args.rear_touchdown_reacquire_min_phase), 1.0),
+                0.0,
+            )
+        if args.rear_touchdown_reacquire_upward_vel_damping is not None:
+            cfg.linear_osqp_params["rear_touchdown_reacquire_upward_vel_damping"] = max(
+                float(args.rear_touchdown_reacquire_upward_vel_damping),
+                0.0,
+            )
+        if args.rear_touchdown_retry_descent_depth is not None:
+            cfg.linear_osqp_params["rear_touchdown_retry_descent_depth"] = max(
+                float(args.rear_touchdown_retry_descent_depth),
+                0.0,
+            )
+        if args.rear_touchdown_retry_descent_kp is not None:
+            cfg.linear_osqp_params["rear_touchdown_retry_descent_kp"] = max(
+                float(args.rear_touchdown_retry_descent_kp),
+                0.0,
+            )
+        if args.rear_touchdown_retry_descent_kd is not None:
+            cfg.linear_osqp_params["rear_touchdown_retry_descent_kd"] = max(
+                float(args.rear_touchdown_retry_descent_kd),
+                0.0,
+            )
+        if args.rear_touchdown_contact_debounce_s is not None:
+            cfg.linear_osqp_params["rear_touchdown_contact_debounce_s"] = max(
+                float(args.rear_touchdown_contact_debounce_s),
+                0.0,
+            )
+        if args.rear_touchdown_contact_min_phase is not None:
+            cfg.linear_osqp_params["rear_touchdown_contact_min_phase"] = max(
+                min(float(args.rear_touchdown_contact_min_phase), 1.0),
+                0.0,
+            )
+        if args.rear_touchdown_contact_max_upward_vel is not None:
+            cfg.linear_osqp_params["rear_touchdown_contact_max_upward_vel"] = float(
+                args.rear_touchdown_contact_max_upward_vel
+            )
+        if args.rear_touchdown_contact_min_grf_z is not None:
+            cfg.linear_osqp_params["rear_touchdown_contact_min_grf_z"] = max(
+                float(args.rear_touchdown_contact_min_grf_z),
+                0.0,
+            )
         if args.stance_anchor_update_alpha is not None:
             cfg.linear_osqp_params["stance_anchor_update_alpha"] = float(
                 max(min(args.stance_anchor_update_alpha, 1.0), 0.0)
@@ -474,6 +652,13 @@ def main() -> None:
                 float(args.front_touchdown_confirm_hold_s),
                 0.0,
             )
+        if args.rear_touchdown_confirm_hold_s is not None:
+            cfg.linear_osqp_params["rear_touchdown_confirm_hold_s"] = max(
+                float(args.rear_touchdown_confirm_hold_s),
+                0.0,
+            )
+        if args.rear_touchdown_confirm_keep_swing:
+            cfg.linear_osqp_params["rear_touchdown_confirm_keep_swing"] = True
         if args.touchdown_confirm_forward_scale is not None:
             cfg.linear_osqp_params["touchdown_confirm_forward_scale"] = float(
                 max(min(args.touchdown_confirm_forward_scale, 1.0), 0.0)
@@ -482,6 +667,8 @@ def main() -> None:
             cfg.linear_osqp_params["touchdown_settle_hold_s"] = max(float(args.touchdown_settle_hold_s), 0.0)
         if args.front_touchdown_settle_hold_s is not None:
             cfg.linear_osqp_params["front_touchdown_settle_hold_s"] = max(float(args.front_touchdown_settle_hold_s), 0.0)
+        if args.rear_touchdown_settle_hold_s is not None:
+            cfg.linear_osqp_params["rear_touchdown_settle_hold_s"] = max(float(args.rear_touchdown_settle_hold_s), 0.0)
         if args.touchdown_settle_forward_scale is not None:
             cfg.linear_osqp_params["touchdown_settle_forward_scale"] = float(
                 max(min(args.touchdown_settle_forward_scale, 1.0), 0.0)
@@ -511,6 +698,58 @@ def main() -> None:
         if args.touchdown_support_anchor_z_blend is not None:
             cfg.linear_osqp_params["touchdown_support_anchor_z_blend"] = float(
                 max(min(args.touchdown_support_anchor_z_blend, 1.0), 0.0)
+            )
+        if args.rear_touchdown_support_anchor_update_alpha is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_anchor_update_alpha"] = float(
+                max(min(args.rear_touchdown_support_anchor_update_alpha, 1.0), 0.0)
+            )
+        if args.rear_touchdown_support_support_floor_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_support_floor_delta"] = max(
+                float(args.rear_touchdown_support_support_floor_delta), 0.0
+            )
+        if args.rear_touchdown_support_vertical_boost is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_vertical_boost"] = max(
+                float(args.rear_touchdown_support_vertical_boost), 0.0
+            )
+        if args.rear_touchdown_support_z_pos_gain_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_z_pos_gain_delta"] = max(
+                float(args.rear_touchdown_support_z_pos_gain_delta), 0.0
+            )
+        if args.rear_touchdown_support_roll_angle_gain_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_roll_angle_gain_delta"] = max(
+                float(args.rear_touchdown_support_roll_angle_gain_delta), 0.0
+            )
+        if args.rear_touchdown_support_roll_rate_gain_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_roll_rate_gain_delta"] = max(
+                float(args.rear_touchdown_support_roll_rate_gain_delta), 0.0
+            )
+        if args.rear_touchdown_support_pitch_angle_gain_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_pitch_angle_gain_delta"] = max(
+                float(args.rear_touchdown_support_pitch_angle_gain_delta), 0.0
+            )
+        if args.rear_touchdown_support_pitch_rate_gain_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_pitch_rate_gain_delta"] = max(
+                float(args.rear_touchdown_support_pitch_rate_gain_delta), 0.0
+            )
+        if args.rear_touchdown_support_side_rebalance_delta is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_side_rebalance_delta"] = max(
+                float(args.rear_touchdown_support_side_rebalance_delta), 0.0
+            )
+        if args.rear_touchdown_support_front_joint_pd_scale is not None:
+            cfg.linear_osqp_params["rear_touchdown_support_front_joint_pd_scale"] = max(
+                float(args.rear_touchdown_support_front_joint_pd_scale), 0.0
+            )
+        if args.touchdown_contact_vel_z_damping is not None:
+            cfg.linear_osqp_params["touchdown_contact_vel_z_damping"] = max(
+                float(args.touchdown_contact_vel_z_damping), 0.0
+            )
+        if args.front_touchdown_contact_vel_z_damping is not None:
+            cfg.linear_osqp_params["front_touchdown_contact_vel_z_damping"] = max(
+                float(args.front_touchdown_contact_vel_z_damping), 0.0
+            )
+        if args.rear_touchdown_contact_vel_z_damping is not None:
+            cfg.linear_osqp_params["rear_touchdown_contact_vel_z_damping"] = max(
+                float(args.rear_touchdown_contact_vel_z_damping), 0.0
             )
         if args.front_margin_rescue_hold_s is not None:
             cfg.linear_osqp_params["front_margin_rescue_hold_s"] = max(float(args.front_margin_rescue_hold_s), 0.0)
@@ -579,6 +818,18 @@ def main() -> None:
         if args.rear_swing_bridge_lookahead_steps is not None:
             cfg.linear_osqp_params["rear_swing_bridge_lookahead_steps"] = max(
                 int(args.rear_swing_bridge_lookahead_steps), 1
+            )
+        if args.rear_swing_contact_release_timeout_s is not None:
+            cfg.linear_osqp_params["rear_swing_contact_release_timeout_s"] = max(
+                float(args.rear_swing_contact_release_timeout_s), 0.0
+            )
+        if args.rear_swing_release_support_hold_s is not None:
+            cfg.linear_osqp_params["rear_swing_release_support_hold_s"] = max(
+                float(args.rear_swing_release_support_hold_s), 0.0
+            )
+        if args.rear_swing_release_forward_scale is not None:
+            cfg.linear_osqp_params["rear_swing_release_forward_scale"] = float(
+                max(min(args.rear_swing_release_forward_scale, 1.0), 0.0)
             )
         if args.full_contact_recovery_hold_s is not None:
             cfg.linear_osqp_params["full_contact_recovery_hold_s"] = max(float(args.full_contact_recovery_hold_s), 0.0)
@@ -659,12 +910,25 @@ def main() -> None:
             cfg.linear_osqp_params["pre_swing_lookahead_steps"] = max(int(args.pre_swing_lookahead_steps), 0)
 
     cfg.simulation_params["gait"] = args.gait
+    if args.preset == "conservative" and args.gait == "crawl":
+        if args.gait_step_freq is None:
+            cfg.simulation_params["gait_params"][args.gait]["step_freq"] = 0.40
+        if args.gait_duty_factor is None:
+            cfg.simulation_params["gait_params"][args.gait]["duty_factor"] = 0.90
     if args.gait_step_freq is not None:
         cfg.simulation_params["gait_params"][args.gait]["step_freq"] = args.gait_step_freq
     if args.gait_duty_factor is not None:
         cfg.simulation_params["gait_params"][args.gait]["duty_factor"] = args.gait_duty_factor
     cfg.simulation_params["mode"] = "forward" if abs(args.yaw_rate) < 1e-9 else "forward+rotate"
     cfg.simulation_params["mpc_frequency"] = int(round(1.0 / max(args.dt, 1e-6)))
+    if args.contact_condim is not None:
+        cfg.simulation_params["contact_condim_override"] = max(int(args.contact_condim), 1)
+    if args.contact_impratio is not None:
+        cfg.simulation_params["contact_impratio_override"] = max(float(args.contact_impratio), 1.0)
+    if args.contact_torsional_friction is not None:
+        cfg.simulation_params["contact_torsional_friction_override"] = max(float(args.contact_torsional_friction), 0.0)
+    if args.contact_rolling_friction is not None:
+        cfg.simulation_params["contact_rolling_friction_override"] = max(float(args.contact_rolling_friction), 0.0)
 
     recording = Path(args.recording_path) if args.recording_path else None
     artifact_dir = Path(args.artifact_dir) if args.artifact_dir else None
@@ -675,6 +939,10 @@ def main() -> None:
         0.0,
     )
     controller_ref_base_ang_vel = (0.0, 0.0, float(args.yaw_rate))
+    friction_coeff = (0.5, 1.0)
+    if args.ground_friction is not None:
+        friction_value = max(float(args.ground_friction), 1e-6)
+        friction_coeff = (friction_value, friction_value)
 
     output = run_simulation(
         cfg,
@@ -682,6 +950,7 @@ def main() -> None:
         num_seconds_per_episode=args.seconds,
         ref_base_lin_vel=(command_speed, command_speed),
         ref_base_ang_vel=(args.yaw_rate, args.yaw_rate),
+        friction_coeff=friction_coeff,
         base_vel_command_type="forward" if abs(args.yaw_rate) < 1e-9 else "forward+rotate",
         seed=args.seed,
         render=args.render,

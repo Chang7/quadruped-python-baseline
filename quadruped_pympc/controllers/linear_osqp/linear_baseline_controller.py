@@ -53,6 +53,8 @@ class LinearOSQPConfig:
     du_z_max: float = np.inf
     stance_ramp_steps: int = 1
     fy_scale: float = 1.0
+    dynamic_fy_roll_gain: float = 0.0
+    dynamic_fy_roll_ref: float = 0.20
     grf_max_scale: float = 1.0
     support_force_floor_ratio: float = 0.0
     latched_force_scale: float = 1.0
@@ -116,6 +118,8 @@ def _get_linear_params() -> dict:
         "du_z_max": 3.5,
         "stance_ramp_steps": 6,
         "fy_scale": 0.15,
+        "dynamic_fy_roll_gain": 0.0,
+        "dynamic_fy_roll_ref": 0.20,
         "grf_max_scale": 0.35,
         "support_force_floor_ratio": 0.0,
         "latched_force_scale": 1.0,
@@ -204,6 +208,8 @@ class LinearSRBDController:
             du_z_max=float(params.get("du_z_max", np.inf)),
             stance_ramp_steps=max(1, int(params.get("stance_ramp_steps", 1))),
             fy_scale=float(params.get("fy_scale", 1.0)),
+            dynamic_fy_roll_gain=float(params.get("dynamic_fy_roll_gain", 0.0)),
+            dynamic_fy_roll_ref=float(params.get("dynamic_fy_roll_ref", 0.20)),
             grf_max_scale=float(params.get("grf_max_scale", 1.0)),
             support_force_floor_ratio=float(params.get("support_force_floor_ratio", 0.0)),
             latched_force_scale=float(params.get("latched_force_scale", 1.0)),
@@ -684,6 +690,7 @@ class LinearSRBDController:
         contact_now: np.ndarray,
         planned_now: np.ndarray,
         release_alpha: np.ndarray,
+        roll_now: float,
         pitch_now: float,
         cfg: LinearOSQPConfig,
     ) -> np.ndarray:
@@ -701,7 +708,14 @@ class LinearSRBDController:
                 self.stance_age[leg] = 0
                 u[leg, :] = 0.0
         self.prev_contact = contact_now.copy()
-        u[:, 1] *= float(cfg.fy_scale)
+        fy_scale = float(cfg.fy_scale)
+        dynamic_fy_roll_gain = float(max(cfg.dynamic_fy_roll_gain, 0.0))
+        if dynamic_fy_roll_gain > 1e-9:
+            roll_ratio = float(
+                np.clip(abs(float(roll_now)) / max(float(cfg.dynamic_fy_roll_ref), 1e-6), 0.0, 1.0)
+            )
+            fy_scale = min(1.0, fy_scale + dynamic_fy_roll_gain * roll_ratio)
+        u[:, 1] *= fy_scale
         u = self._scale_latched_support(u, contact_now, planned_now, release_alpha, pitch_now, cfg).reshape(4, 3)
         u[:, 2] = np.clip(u[:, 2], cfg.grf_min, cfg.grf_max)
         u = self._apply_contact_floors(u, contact_now, planned_now, cfg).reshape(4, 3)
@@ -801,22 +815,27 @@ class LinearSRBDController:
                     )
                 )
                 extra_transfer = side_rebalance_gain * abs(roll_ratio) * side_nominal
+                # Body-frame +y points to the robot's left. With the standard
+                # right-hand convention, positive roll means the robot is
+                # falling toward the right side, so the extra load should be
+                # shifted toward the right support legs rather than away from
+                # them.
                 if roll_ratio > 0.0:
-                    left_target = float(fz_active[local_left].sum()) + extra_transfer
-                    fz_active = LinearSRBDController._transfer_group_load(
-                        fz_active,
-                        local_left,
-                        local_right,
-                        left_target,
-                        lower,
-                    )
-                elif roll_ratio < 0.0:
                     right_target = float(fz_active[local_right].sum()) + extra_transfer
                     fz_active = LinearSRBDController._transfer_group_load(
                         fz_active,
                         local_right,
                         local_left,
                         right_target,
+                        lower,
+                    )
+                elif roll_ratio < 0.0:
+                    left_target = float(fz_active[local_left].sum()) + extra_transfer
+                    fz_active = LinearSRBDController._transfer_group_load(
+                        fz_active,
+                        local_left,
+                        local_right,
+                        left_target,
                         lower,
                     )
 
@@ -1018,13 +1037,25 @@ class LinearSRBDController:
             u0_raw = z[(cfg.horizon + 1) * NX : (cfg.horizon + 1) * NX + NU].reshape(NU)
             u0 = self._apply_slew_and_smoothing(u0_raw, u_prev, cfg)
             u0 = self._apply_contact_conditioning(
-                u0, contact_schedule[0], planned_schedule[0], release_alpha, float(x_init[IDX_TH][1]), cfg
+                u0,
+                contact_schedule[0],
+                planned_schedule[0],
+                release_alpha,
+                float(x_init[IDX_TH][0]),
+                float(x_init[IDX_TH][1]),
+                cfg,
             )
             self.last_u = u0.copy()
             self.last_status = status
         except Exception as exc:  # pragma: no cover - fallback path for runtime robustness
             u0 = self._apply_contact_conditioning(
-                u_prev.copy(), contact_schedule[0], planned_schedule[0], release_alpha, float(x_init[IDX_TH][1]), cfg
+                u_prev.copy(),
+                contact_schedule[0],
+                planned_schedule[0],
+                release_alpha,
+                float(x_init[IDX_TH][0]),
+                float(x_init[IDX_TH][1]),
+                cfg,
             )
             self.last_u = u0.copy()
             self.last_status = f"fallback:{type(exc).__name__}:{exc}"

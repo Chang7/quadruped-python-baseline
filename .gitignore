@@ -347,3 +347,11 @@ outputs/report_progress_explainer/*.mp4
 
 # Local convenience copies
 gifs/
+
+# Local environments and scratch folders used during debugging
+.venv310/
+.venv_win/
+py310/
+tmp_*/
+tmp_remote_repo/
+Quadruped-PyMPC_linear_osqp_adapter.zip

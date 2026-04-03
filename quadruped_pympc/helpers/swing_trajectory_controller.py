@@ -42,7 +42,7 @@ class SwingTrajectoryController:
         self.swing_period = swing_period
 
     def compute_swing_control_cartesian_space(
-        self, leg_id, q_dot, J, J_dot, lift_off, touch_down, foot_pos, foot_vel, passive_force, h, mass_matrix, early_stance_hitmoments, early_stance_hitpoints
+        self, leg_id, q_dot, J, J_dot, lift_off, touch_down, foot_pos, foot_vel, passive_force, h, mass_matrix, early_stance_hitmoments, early_stance_hitpoints, swing_time_override=None
     ):
         """TODO: Docstring.
 
@@ -66,8 +66,9 @@ class SwingTrajectoryController:
 
         """
         # Compute trajectory references
+        swing_time = self.swing_time[leg_id] if swing_time_override is None else swing_time_override
         des_foot_pos, des_foot_vel, des_foot_acc = self.swing_generator.compute_trajectory_references(
-            self.swing_time[leg_id], lift_off, touch_down, early_stance_hitmoments, early_stance_hitpoints
+            swing_time, lift_off, touch_down, early_stance_hitmoments, early_stance_hitpoints
         )
 
         err_pos = des_foot_pos - foot_pos

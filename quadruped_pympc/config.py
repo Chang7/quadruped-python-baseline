@@ -252,6 +252,8 @@ linear_osqp_params = {
     'du_z_max': 3.5,             # max per-step change in fz [N]
     'stance_ramp_steps': 6,      # ramp-up steps after a leg enters stance
     'fy_scale': 0.15,            # suppress lateral force during crawl-like debugging
+    'dynamic_fy_roll_gain': 0.0,  # optional extra lateral-force authority that ramps in with absolute roll
+    'dynamic_fy_roll_ref': 0.20,  # roll angle [rad] that saturates the temporary lateral-force boost
     'grf_max_scale': 0.35,       # effective fz upper bound as fraction of body weight per leg total budget
     'support_force_floor_ratio': 0.0,  # minimum share of body weight kept on each stance leg
     'joint_pd_scale': 0.25,      # blend-in low-level joint PD to help realize foothold geometry in torque control
@@ -289,33 +291,59 @@ linear_osqp_params = {
     'support_confirm_require_front_rear_span': True,  # require both a front and rear support contact when both are scheduled
     'support_confirm_forward_scale': 1.0,  # scale forward reference velocity while support confirmation is still pending
     'front_stance_dropout_reacquire': False,  # reuse touchdown reacquire/confirm when a front stance foot unexpectedly loses actual contact
+    'rear_stance_dropout_reacquire': False,  # reuse touchdown reacquire/confirm when a rear stance foot unexpectedly loses actual contact
     'front_late_release_phase_threshold': 1.1,  # >1 disables; otherwise allow front planned-swing legs to open late once support is safe
     'front_late_release_min_margin': None,  # optional front-leg support margin required before the late-release path opens
     'front_late_release_hold_steps': 0,  # legacy controller-step hold after front late release opens
     'front_late_release_hold_s': None,  # controller-side swing hold in seconds after front late release opens
     'front_late_release_forward_scale': 1.0,  # scale forward reference velocity while the front-only late-release path is active
     'support_margin_preview_s': 0.0,  # preview CoM xy motion by this many seconds when checking support-margin safety gates
+    'swing_contact_release_timeout_s': 0.0,  # if a planned swing leg remains physically stuck in contact, stop re-latching it forever after this timeout
+    'front_swing_contact_release_timeout_s': None,  # optional front-leg override for planned-swing contact release timeout
+    'rear_swing_contact_release_timeout_s': None,  # optional rear-leg override for planned-swing contact release timeout
     'front_late_release_extra_margin': 0.0,  # extra safety margin added on top of the front late-release minimum support margin
     'front_late_release_pitch_guard': None,  # optional abs pitch limit [rad] for opening the front late-release path
     'front_late_release_roll_guard': None,  # optional abs roll limit [rad] for opening the front late-release path
     'touchdown_reacquire_hold_s': 0.0,  # keep controller-side swing briefly after planned touchdown if the foot still has no actual contact
     'front_touchdown_reacquire_hold_s': None,  # optional front-leg override for post-swing touchdown reacquire hold
+    'rear_touchdown_reacquire_hold_s': None,  # optional rear-leg override for post-swing touchdown reacquire hold
     'touchdown_reacquire_forward_scale': 1.0,  # scale forward reference velocity while waiting for actual touchdown reacquire
     'touchdown_reacquire_xy_blend': 0.0,  # blend touchdown reacquire target xy toward the stored touchdown position
     'front_touchdown_reacquire_xy_blend': None,  # optional front-leg override for touchdown reacquire xy blend
+    'rear_touchdown_reacquire_xy_blend': None,  # optional rear-leg override for touchdown reacquire xy blend
     'touchdown_reacquire_extra_depth': 0.0,  # lower the touchdown reacquire target below the nominal touchdown height
     'front_touchdown_reacquire_extra_depth': None,  # optional front-leg override for touchdown reacquire extra depth
+    'rear_touchdown_reacquire_extra_depth': None,  # optional rear-leg override for touchdown reacquire extra depth
     'touchdown_reacquire_forward_bias': 0.0,  # forward x bias added to the touchdown reacquire target
     'front_touchdown_reacquire_forward_bias': None,  # optional front-leg override for touchdown reacquire forward bias
+    'rear_touchdown_reacquire_forward_bias': None,  # optional rear-leg override for touchdown reacquire forward bias
+    'rear_touchdown_reacquire_force_until_contact': False,  # keep rear controller-side swing active during planned stance until actual contact truly returns
+    'rear_touchdown_reacquire_min_swing_time_s': 0.0,  # optional minimum rear swing time [s] before planned-stance reacquire support is allowed to take over
+    'rear_touchdown_reacquire_hold_current_xy': False,  # keep rear touchdown reacquire mostly vertical by holding the current foot xy instead of chasing the nominal foothold
+    'rear_touchdown_reacquire_max_xy_shift': 0.0,  # optional cap [m] on how far a rear reacquire target may move away from the current foot xy
+    'rear_touchdown_reacquire_min_phase': 0.0,  # optional minimum swing phase [0, 1] enforced during rear touchdown reacquire to bias the foot into late descent
+    'rear_touchdown_reacquire_upward_vel_damping': 0.0,  # extra task-space damping [N*s/m] applied only to positive rear foot z velocity while waiting for actual recontact
+    'rear_touchdown_retry_descent_depth': 0.0,  # extra downward search depth [m] applied only after a rear false-close retry opens swing again
+    'rear_touchdown_retry_descent_kp': 0.0,  # vertical task-space stiffness [N/m] used during rear false-close retry descent assist
+    'rear_touchdown_retry_descent_kd': 0.0,  # vertical task-space damping [N*s/m] used during rear false-close retry descent assist
+    'rear_touchdown_contact_debounce_s': 0.0,  # require rear actual contact to persist this long before closing controller-side swing during force-until-contact
+    'rear_touchdown_contact_min_phase': 0.0,  # require rear swing phase to reach at least this value before controller-side contact may close on touchdown
+    'rear_touchdown_contact_max_upward_vel': None,  # optional max allowed upward rear foot z velocity [m/s] before controller-side contact may close on touchdown
+    'rear_touchdown_contact_min_grf_z': 0.0,  # require at least this upward world-frame GRF [N] before rear touchdown is treated as truly load-bearing
     'stance_anchor_update_alpha': 0.0,  # continuously relax stance touchdown anchors toward actual contacted foot position
     'front_stance_anchor_update_alpha': None,  # optional front-leg override for stance anchor update alpha
+    'rear_stance_anchor_update_alpha': None,  # optional rear-leg override for stance anchor update alpha
     'touchdown_support_anchor_update_alpha': 0.0,  # relax stance touchdown anchors toward actual foot position only while touchdown support is active
     'front_touchdown_support_anchor_update_alpha': None,  # optional front-leg override for touchdown-support anchor update alpha
+    'rear_touchdown_support_anchor_update_alpha': None,  # optional rear-leg override for touchdown-support anchor update alpha
     'touchdown_confirm_hold_s': 0.0,  # keep a short confirmation window after actual touchdown returns
     'front_touchdown_confirm_hold_s': None,  # optional front-leg override for touchdown confirmation window
+    'rear_touchdown_confirm_hold_s': None,  # optional rear-leg override for touchdown confirmation window
+    'rear_touchdown_confirm_keep_swing': False,  # keep rear controller-side swing active during touchdown confirm so swing phase is not reset by a flaky first contact
     'touchdown_confirm_forward_scale': 1.0,  # scale forward reference velocity during the touchdown confirmation window
     'touchdown_settle_hold_s': 0.0,  # keep a short post-touchdown settling window after actual contact comes back
     'front_touchdown_settle_hold_s': None,  # optional front-leg override for the post-touchdown settling window
+    'rear_touchdown_settle_hold_s': None,  # optional rear-leg override for the post-touchdown settling window
     'touchdown_settle_forward_scale': 1.0,  # scale forward reference velocity during the post-touchdown settling window
     'touchdown_support_rear_floor_delta': 0.0,  # temporary extra rear-load floor applied while front touchdown confirm/settle is active
     'touchdown_support_vertical_boost': 0.0,  # temporary extra body-weight-scaled lift request during front touchdown support
@@ -328,6 +356,18 @@ linear_osqp_params = {
     'touchdown_support_rear_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on rear support legs during front touchdown support
     'touchdown_support_anchor_xy_blend': 0.0,  # blend a front touchdown support leg's stance target toward the actual contacted foot xy location
     'touchdown_support_anchor_z_blend': 0.0,  # blend a front touchdown support leg's stance target height toward the actual contacted foot z location
+    'rear_touchdown_support_support_floor_delta': 0.0,  # temporary extra all-stance support floor applied while rear touchdown support is active
+    'rear_touchdown_support_vertical_boost': 0.0,  # temporary extra body-weight-scaled lift request during rear touchdown support
+    'rear_touchdown_support_z_pos_gain_delta': 0.0,  # temporary extra height gain during rear touchdown support
+    'rear_touchdown_support_roll_angle_gain_delta': 0.0,  # temporary extra roll-angle gain during rear touchdown support
+    'rear_touchdown_support_roll_rate_gain_delta': 0.0,  # temporary extra roll-rate gain during rear touchdown support
+    'rear_touchdown_support_pitch_angle_gain_delta': 0.0,  # temporary extra pitch-angle gain during rear touchdown support
+    'rear_touchdown_support_pitch_rate_gain_delta': 0.0,  # temporary extra pitch-rate gain during rear touchdown support
+    'rear_touchdown_support_side_rebalance_delta': 0.0,  # temporary extra signed left/right load rebalance during rear touchdown support
+    'rear_touchdown_support_front_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on front support legs during rear touchdown support
+    'touchdown_contact_vel_z_damping': 0.0,  # task-space vertical damping applied during touchdown support windows
+    'front_touchdown_contact_vel_z_damping': None,  # optional front-leg override for touchdown vertical damping
+    'rear_touchdown_contact_vel_z_damping': None,  # optional rear-leg override for touchdown vertical damping
     'front_margin_rescue_hold_s': 0.0,  # keep a brief late front-leg support rescue alive during unstable full-contact stance
     'front_margin_rescue_forward_scale': 1.0,  # scale forward reference velocity while late front-margin rescue is active
     'front_margin_rescue_min_margin': 0.0,  # trigger late front-margin rescue if the queried front support margin falls below this value
@@ -348,6 +388,8 @@ linear_osqp_params = {
     'rear_swing_bridge_height_ratio': 0.0,  # trigger the rear-swing bridge if base height falls below this ratio of ref_z
     'rear_swing_bridge_recent_front_window_s': 0.0,  # require that front touchdown support happened within this recent time window
     'rear_swing_bridge_lookahead_steps': 1,  # horizon steps to inspect for an upcoming rear swing when bridging support
+    'rear_swing_release_support_hold_s': 0.0,  # keep temporary support overrides alive shortly after a rear leg is force-released into swing
+    'rear_swing_release_forward_scale': 1.0,  # scale forward reference velocity while rear forced-release support is active
     'full_contact_recovery_hold_s': 0.0,  # keep touchdown-style support overrides alive for a short time once all feet are back in contact
     'full_contact_recovery_forward_scale': 1.0,  # scale forward reference velocity while the late full-contact recovery hold is active
     'full_contact_recovery_roll_threshold': None,  # abs roll threshold [rad] that can trigger the late full-contact recovery hold

@@ -84,12 +84,15 @@ def init_run_log(controller_type: str, gait: str, robot: str, scene: str) -> dic
         "qvel": [],
         "feet_pos": [],
         "feet_vel": [],
+        "des_foot_pos": [],
+        "des_foot_vel": [],
         "foot_contact": [],
         "foot_grf": [],
         "phase_signal": [],
         "swing_time": [],
         "planned_contact": [],
         "current_contact": [],
+        "swing_contact_release_active": [],
         "latched_release_alpha": [],
         "latched_swing_time": [],
         "support_margin": [],
@@ -105,6 +108,7 @@ def init_run_log(controller_type: str, gait: str, robot: str, scene: str) -> dic
         "touchdown_support_alpha": [],
         "rear_handoff_support_active": [],
         "rear_swing_bridge_active": [],
+        "rear_swing_release_support_active": [],
         "full_contact_recovery_active": [],
         "full_contact_recovery_alpha": [],
         "gate_forward_scale": [],
@@ -161,12 +165,18 @@ def append_step(
     ctrl_state = ctrl_state or {}
     if "phase_signal" in ctrl_state:
         log["phase_signal"].append(_to_numpy(ctrl_state["phase_signal"]))
+    if "des_foot_pos" in ctrl_state:
+        log["des_foot_pos"].append(_to_numpy(ctrl_state["des_foot_pos"]))
+    if "des_foot_vel" in ctrl_state:
+        log["des_foot_vel"].append(_to_numpy(ctrl_state["des_foot_vel"]))
     if "swing_time" in ctrl_state:
         log["swing_time"].append(_to_numpy(ctrl_state["swing_time"]))
     if "planned_contact" in ctrl_state:
         log["planned_contact"].append(_to_numpy(ctrl_state["planned_contact"]))
     if "current_contact" in ctrl_state:
         log["current_contact"].append(_to_numpy(ctrl_state["current_contact"]))
+    if "swing_contact_release_active" in ctrl_state:
+        log["swing_contact_release_active"].append(_to_numpy(ctrl_state["swing_contact_release_active"]))
     if "latched_release_alpha" in ctrl_state:
         log["latched_release_alpha"].append(_to_numpy(ctrl_state["latched_release_alpha"]))
     if "latched_swing_time" in ctrl_state:
@@ -197,6 +207,8 @@ def append_step(
         log["rear_handoff_support_active"].append(float(ctrl_state["rear_handoff_support_active"]))
     if "rear_swing_bridge_active" in ctrl_state:
         log["rear_swing_bridge_active"].append(float(ctrl_state["rear_swing_bridge_active"]))
+    if "rear_swing_release_support_active" in ctrl_state:
+        log["rear_swing_release_support_active"].append(float(ctrl_state["rear_swing_release_support_active"]))
     if "full_contact_recovery_active" in ctrl_state:
         log["full_contact_recovery_active"].append(_to_numpy(ctrl_state["full_contact_recovery_active"]))
     if "full_contact_recovery_alpha" in ctrl_state:

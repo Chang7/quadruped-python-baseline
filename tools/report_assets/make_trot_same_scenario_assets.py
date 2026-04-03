@@ -10,11 +10,19 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT_DIR = ROOT / "outputs" / "report_progress_explainer" / "trot_same_scenario"
+OUT_DIR = ROOT / "outputs" / "report_progress_explainer" / "trot_stable_compare"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-STOCK_DIR = ROOT / "outputs" / "same_scenario_compare_mp4" / "sampling_trot" / "episode_000"
-LINEAR_DIR = ROOT / "outputs" / "same_scenario_compare_mp4" / "linear_trot" / "episode_000"
+STOCK_DIR = ROOT / "outputs" / "archive" / "raw_runs" / "same_scenario_compare_mp4" / "sampling_trot" / "episode_000"
+LINEAR_DIR = ROOT / "outputs" / "curated_runs" / "trot_after_confirm_bypass" / "episode_000"
+LINEAR_VERIFY_SUMMARY = (
+    ROOT
+    / "outputs"
+    / "curated_runs"
+    / "trot_after_crawl_balanced_default"
+    / "episode_000"
+    / "summary.json"
+)
 
 LEG_NAMES = ["FL", "FR", "RL", "RR"]
 
@@ -43,6 +51,7 @@ def _invalid_contact_text(summary: dict) -> str:
 def make_compare_table() -> Path:
     stock = json.loads((STOCK_DIR / "summary.json").read_text(encoding="utf-8"))
     linear = json.loads((LINEAR_DIR / "summary.json").read_text(encoding="utf-8"))
+    linear_verify = json.loads(LINEAR_VERIFY_SUMMARY.read_text(encoding="utf-8"))
 
     columns = [
         "controller",
@@ -50,6 +59,7 @@ def make_compare_table() -> Path:
         "terminated",
         "mean base z [m]",
         "mean |roll| [rad]",
+        "mean |pitch| [rad]",
         "front swing",
         "termination",
     ]
@@ -60,6 +70,7 @@ def make_compare_table() -> Path:
             str(stock["terminated_any"]),
             f"{stock['mean_base_z']:.3f}",
             f"{stock['mean_abs_roll']:.3f}",
+            f"{stock['mean_abs_pitch']:.3f}",
             f"{stock['front_actual_swing_realization_mean']:.3f}",
             _invalid_contact_text(stock),
         ],
@@ -69,12 +80,13 @@ def make_compare_table() -> Path:
             str(linear["terminated_any"]),
             f"{linear['mean_base_z']:.3f}",
             f"{linear['mean_abs_roll']:.3f}",
+            f"{linear['mean_abs_pitch']:.3f}",
             f"{linear['front_actual_swing_realization_mean']:.3f}",
             _invalid_contact_text(linear),
         ],
     ]
 
-    fig, ax = plt.subplots(figsize=(11.8, 2.8))
+    fig, ax = plt.subplots(figsize=(12.8, 3.2))
     ax.axis("off")
     table = ax.table(
         cellText=rows,
@@ -96,14 +108,22 @@ def make_compare_table() -> Path:
             cell.set_facecolor("#fff5ef")
 
     fig.suptitle(
-        "Same-scenario trot comparison\n"
+        "Stable trot comparison\n"
         "robot=aliengo | scene=flat | gait=trot | command=vx=0.12, yaw=0.0",
         fontsize=12,
         fontweight="bold",
         y=0.98,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.86))
-    out_path = OUT_DIR / "trot_same_scenario_compare_table.png"
+    fig.text(
+        0.01,
+        0.02,
+        f"Additional verification: linear_osqp also completed a separate 20 s trot run without termination "
+        f"(mean_vx={linear_verify['mean_vx']:.3f}, mean|pitch|={linear_verify['mean_abs_pitch']:.3f}).",
+        fontsize=9.5,
+        family="monospace",
+    )
+    fig.tight_layout(rect=(0, 0.05, 1, 0.86))
+    out_path = OUT_DIR / "trot_stable_compare_table.png"
     fig.savefig(out_path, dpi=220)
     plt.close(fig)
     return out_path
@@ -113,41 +133,51 @@ def make_stock_image() -> Path:
     stock = _load_episode(STOCK_DIR)
     t = np.asarray(stock["time"], dtype=float)
     z = np.asarray(stock["base_pos"], dtype=float)[:, 2]
+    roll = np.asarray(stock["base_ori_euler_xyz"], dtype=float)[:, 0]
+    pitch = np.asarray(stock["base_ori_euler_xyz"], dtype=float)[:, 1]
     actual = np.asarray(stock["foot_contact"], dtype=float)
 
-    fig = plt.figure(figsize=(11, 6.4))
-    gs = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.15], hspace=0.34)
+    fig = plt.figure(figsize=(11, 8.3))
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.0, 1.15], hspace=0.34)
     ax1 = fig.add_subplot(gs[0, 0])
     ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    ax3 = fig.add_subplot(gs[2, 0], sharex=ax1)
 
     ax1.plot(t, z, color="tab:blue", linewidth=2.0, label="base z")
     ax1.axhline(float(stock["summary"]["ref_base_height"]), color="tab:blue", linestyle="--", alpha=0.45, label="ref z")
     ax1.set_title("Stock sampling-based MPC | aliengo | flat | trot | vx=0.12 | yaw=0.0")
     ax1.set_ylabel("height [m]")
     ax1.grid(alpha=0.3)
-    ax1.legend(loc="upper right")
+    ax1.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
+
+    ax2.plot(t, np.rad2deg(roll), color="tab:orange", linewidth=1.8, label="roll")
+    ax2.plot(t, np.rad2deg(pitch), color="tab:green", linewidth=1.8, label="pitch")
+    ax2.set_ylabel("angle [deg]")
+    ax2.grid(alpha=0.3)
+    ax2.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
 
     offsets = [0.0, 1.1, 2.2, 3.3]
     for idx, leg_name in enumerate(LEG_NAMES):
-        ax2.plot(t, _contact_to_band(actual[:, idx], offsets[idx]), linewidth=1.8, label=f"{leg_name} actual")
-    ax2.set_yticks([0.4, 1.5, 2.6, 3.7])
-    ax2.set_yticklabels(LEG_NAMES)
-    ax2.set_xlabel("time [s]")
-    ax2.set_title("Actual foot-contact timeline")
-    ax2.grid(alpha=0.3)
-    ax2.legend(loc="upper right", ncol=2, fontsize=9)
+        ax3.plot(t, _contact_to_band(actual[:, idx], offsets[idx]), linewidth=1.8, label=f"{leg_name} actual")
+    ax3.set_yticks([0.4, 1.5, 2.6, 3.7])
+    ax3.set_yticklabels(LEG_NAMES)
+    ax3.set_xlabel("time [s]")
+    ax3.set_title("Actual foot-contact timeline")
+    ax3.grid(alpha=0.3)
+    ax3.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), ncol=1, fontsize=9)
 
     fig.text(
         0.02,
         0.02,
         f"duration={stock['summary']['duration_s']:.3f}s | mean_z={stock['summary']['mean_base_z']:.3f} | "
-        f"mean|roll|={stock['summary']['mean_abs_roll']:.3f} | front swing={stock['summary']['front_actual_swing_realization_mean']:.3f} | termination=none",
+        f"mean|roll|={stock['summary']['mean_abs_roll']:.3f} | mean|pitch|={stock['summary']['mean_abs_pitch']:.3f} | "
+        f"front swing={stock['summary']['front_actual_swing_realization_mean']:.3f} | termination=none",
         fontsize=10,
         family="monospace",
     )
-    fig.tight_layout(rect=(0, 0.04, 1, 1))
+    fig.tight_layout(rect=(0, 0.04, 0.83, 1))
 
-    out_path = OUT_DIR / "stock_sampling_trot_explainer.png"
+    out_path = OUT_DIR / "stock_sampling_trot_stable_explainer.png"
     fig.savefig(out_path, dpi=220)
     plt.close(fig)
     return out_path
@@ -172,13 +202,13 @@ def make_linear_image() -> Path:
     ax1.set_title("Custom linear_osqp MPC | aliengo | flat | trot | vx=0.12 | yaw=0.0")
     ax1.set_ylabel("height [m]")
     ax1.grid(alpha=0.3)
-    ax1.legend(loc="upper right")
+    ax1.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
 
     ax2.plot(t, np.rad2deg(roll), color="tab:orange", linewidth=1.8, label="roll")
     ax2.plot(t, np.rad2deg(pitch), color="tab:green", linewidth=1.8, label="pitch")
     ax2.set_ylabel("angle [deg]")
     ax2.grid(alpha=0.3)
-    ax2.legend(loc="upper right")
+    ax2.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
 
     offsets = [0.0, 1.1, 2.2, 3.3]
     for idx, leg_name in enumerate(LEG_NAMES):
@@ -188,7 +218,7 @@ def make_linear_image() -> Path:
     ax3.set_xlabel("time [s]")
     ax3.set_title("Actual foot-contact timeline")
     ax3.grid(alpha=0.3)
-    ax3.legend(loc="upper right", ncol=2, fontsize=9)
+    ax3.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), ncol=1, fontsize=9)
 
     term_time = linear["summary"]["meta"].get("termination_time")
     if term_time is not None:
@@ -199,14 +229,15 @@ def make_linear_image() -> Path:
         0.02,
         0.02,
         f"duration={linear['summary']['duration_s']:.3f}s | mean_z={linear['summary']['mean_base_z']:.3f} | "
-        f"mean|roll|={linear['summary']['mean_abs_roll']:.3f} | front swing={linear['summary']['front_actual_swing_realization_mean']:.3f} | "
-        f"termination=front-left hip contact",
+        f"mean|roll|={linear['summary']['mean_abs_roll']:.3f} | mean|pitch|={linear['summary']['mean_abs_pitch']:.3f} | "
+        f"front swing={linear['summary']['front_actual_swing_realization_mean']:.3f} | "
+        f"termination={_invalid_contact_text(linear['summary'])}",
         fontsize=10,
         family="monospace",
     )
-    fig.tight_layout(rect=(0, 0.04, 1, 1))
+    fig.tight_layout(rect=(0, 0.04, 0.83, 1))
 
-    out_path = OUT_DIR / "linear_osqp_trot_explainer.png"
+    out_path = OUT_DIR / "linear_osqp_trot_stable_explainer.png"
     fig.savefig(out_path, dpi=220)
     plt.close(fig)
     return out_path
@@ -272,7 +303,7 @@ def make_stock_gif() -> Path:
             "aliengo | flat | vx=0.12 | yaw=0.0",
             f"duration={summary['duration_s']:.3f}s | no termination",
         ],
-        OUT_DIR / "stock_sampling_trot.gif",
+        OUT_DIR / "stock_sampling_trot_stable.gif",
     )
 
 
@@ -283,9 +314,9 @@ def make_linear_gif() -> Path:
         "Custom linear_osqp | trot",
         [
             "aliengo | flat | vx=0.12 | yaw=0.0",
-            f"duration={summary['duration_s']:.3f}s | front-left hip contact",
+            f"duration={summary['duration_s']:.3f}s | no termination",
         ],
-        OUT_DIR / "linear_osqp_trot.gif",
+        OUT_DIR / "linear_osqp_trot_stable.gif",
     )
 
 

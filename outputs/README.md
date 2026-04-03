@@ -12,6 +12,8 @@ All generated results should live under this `outputs/` folder.
   - raw stock-stack diagnostic history
 - `archive/`
   - older raw runs and superseded output folders kept for traceability
+  - also the right place for exploratory `tmp_*` run folders once they are no
+    longer active
 
 ## Suggested Reading Order
 
