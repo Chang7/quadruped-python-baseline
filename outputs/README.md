@@ -2,6 +2,10 @@
 
 All generated results should live under this `outputs/` folder.
 
+Only this summary file is tracked in Git. The actual run artifacts, images,
+GIFs, and temporary experiment folders are kept locally and should not be
+committed to GitHub.
+
 ## Current Structure
 
 - `curated_runs/`

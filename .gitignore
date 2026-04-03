@@ -181,19 +181,9 @@ archive/backups/
 references/external_repos/
 references/notes/raw_extracts/
 
-# Large or raw experimental outputs
-outputs/archive/
-outputs/stock_stack_runs/
-outputs/curated_runs/*
-!outputs/curated_runs/README.md
-outputs/report_progress_explainer/archive/
-outputs/report_progress_explainer/*.docx
-
-# Keep only selected explainer assets, not legacy root-level artifacts
-outputs/report_progress_explainer/*.png
-outputs/report_progress_explainer/*.gif
-outputs/report_progress_explainer/*.mp4
-!outputs/report_progress_explainer/README.md
+# Generated outputs are kept locally, not in Git
+outputs/*
+!outputs/README.md
 
 # Local convenience copies
 gifs/
