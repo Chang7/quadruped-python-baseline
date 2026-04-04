@@ -108,13 +108,19 @@ class WBInterface:
         self.contact_latch_steps = 6
         self.startup_full_stance_time_s = 0.0
         self.contact_latch_budget_s = 0.0
+        self.rear_contact_latch_steps = 6
+        self.rear_contact_latch_budget_s = 0.0
         self.virtual_unlatch_hold_s = 0.0
         self.pre_swing_gate_min_margin = 0.0
         self.front_pre_swing_gate_min_margin = 0.0
         self.rear_pre_swing_gate_min_margin = 0.0
+        self.rear_pre_swing_gate_hold_s = 0.0
         self.swing_contact_release_timeout_s = 0.0
         self.front_swing_contact_release_timeout_s = 0.0
         self.rear_swing_contact_release_timeout_s = 0.0
+        self.rear_release_lift_height = 0.0
+        self.rear_release_lift_kp = 0.0
+        self.rear_release_lift_kd = 0.0
         self.support_contact_confirm_hold_s = 0.0
         self.front_support_contact_confirm_hold_s = 0.0
         self.rear_support_contact_confirm_hold_s = 0.0
@@ -157,6 +163,8 @@ class WBInterface:
         self.rear_touchdown_contact_min_phase = 0.0
         self.rear_touchdown_contact_max_upward_vel = np.inf
         self.rear_touchdown_contact_min_grf_z = 0.0
+        self.rear_crawl_disable_reflex_swing = False
+        self.rear_crawl_swing_height_scale = 1.0
         self.stance_anchor_update_alpha = 0.0
         self.front_stance_anchor_update_alpha = 0.0
         self.rear_stance_anchor_update_alpha = 0.0
@@ -227,6 +235,7 @@ class WBInterface:
         self.touchdown_confirm_active = np.zeros(4, dtype=int)
         self.touchdown_settle_active = np.zeros(4, dtype=int)
         self.touchdown_support_active = np.zeros(4, dtype=int)
+        self.rear_touchdown_pending_confirm = np.zeros(4, dtype=int)
         self.front_margin_rescue_active = np.zeros(4, dtype=int)
         self.touchdown_support_alpha = 0.0
         self.front_touchdown_support_alpha = 0.0
@@ -274,6 +283,16 @@ class WBInterface:
         self.contact_latch_budget_s = self._resolve_duration_seconds(
             params, 'contact_latch_budget_s', 'contact_latch_budget_steps', step_dt=self.mpc_dt
         )
+        rear_contact_latch_steps = params.get('rear_contact_latch_steps', None)
+        self.rear_contact_latch_steps = max(
+            int(self.contact_latch_steps if rear_contact_latch_steps is None else rear_contact_latch_steps),
+            0,
+        )
+        rear_contact_latch_budget_s = params.get('rear_contact_latch_budget_s', None)
+        self.rear_contact_latch_budget_s = max(
+            float(self.contact_latch_budget_s if rear_contact_latch_budget_s is None else rear_contact_latch_budget_s),
+            0.0,
+        )
         self.virtual_unlatch_hold_s = self._resolve_duration_seconds(
             params, 'virtual_unlatch_hold_s', 'virtual_unlatch_hold_steps', step_dt=self.mpc_dt
         )
@@ -299,6 +318,9 @@ class WBInterface:
             float(self.swing_contact_release_timeout_s if rear_release_timeout is None else rear_release_timeout),
             0.0,
         )
+        self.rear_release_lift_height = max(float(params.get('rear_release_lift_height', 0.0)), 0.0)
+        self.rear_release_lift_kp = max(float(params.get('rear_release_lift_kp', 0.0)), 0.0)
+        self.rear_release_lift_kd = max(float(params.get('rear_release_lift_kd', 0.0)), 0.0)
         self.support_contact_confirm_hold_s = max(float(params.get('support_contact_confirm_hold_s', 0.0)), 0.0)
         front_confirm_hold = params.get('front_support_contact_confirm_hold_s', None)
         rear_confirm_hold = params.get('rear_support_contact_confirm_hold_s', None)
@@ -457,6 +479,10 @@ class WBInterface:
         self.rear_touchdown_contact_min_grf_z = max(
             float(params.get('rear_touchdown_contact_min_grf_z', 0.0)),
             0.0,
+        )
+        self.rear_crawl_disable_reflex_swing = bool(params.get('rear_crawl_disable_reflex_swing', False))
+        self.rear_crawl_swing_height_scale = float(
+            np.clip(params.get('rear_crawl_swing_height_scale', 1.0), 0.0, 1.0)
         )
         self.stance_anchor_update_alpha = float(
             np.clip(params.get('stance_anchor_update_alpha', 0.0), 0.0, 1.0)
@@ -622,12 +648,19 @@ class WBInterface:
             0.0,
         )
         self.pre_swing_gate_hold_s = max(float(params.get('pre_swing_gate_hold_s', 0.0)), 0.0)
+        rear_pre_swing_gate_hold_s = params.get('rear_pre_swing_gate_hold_s', None)
+        self.rear_pre_swing_gate_hold_s = max(
+            float(self.pre_swing_gate_hold_s if rear_pre_swing_gate_hold_s is None else rear_pre_swing_gate_hold_s),
+            0.0,
+        )
 
         # Dynamic two-leg-support gaits need faster swing opening and should
         # not inherit the conservative crawl-style latch/gating defaults.
         if getattr(self, 'is_dynamic_gait', False):
             self.contact_latch_steps = 0
             self.contact_latch_budget_s = 0.0
+            self.rear_contact_latch_steps = 0
+            self.rear_contact_latch_budget_s = 0.0
             self.virtual_unlatch_hold_s = 0.0
             self.pre_swing_gate_min_margin = 0.0
             self.front_pre_swing_gate_min_margin = 0.0
@@ -639,6 +672,7 @@ class WBInterface:
             self.front_support_contact_confirm_hold_s = 0.0
             self.rear_support_contact_confirm_hold_s = 0.0
             self.pre_swing_gate_hold_s = 0.0
+            self.rear_pre_swing_gate_hold_s = 0.0
             self.rear_swing_release_support_hold_s = 0.0
             self.rear_swing_release_forward_scale = 1.0
 
@@ -646,6 +680,11 @@ class WBInterface:
         if int(leg_id) < 2:
             return float(self.front_pre_swing_gate_min_margin)
         return float(self.rear_pre_swing_gate_min_margin)
+
+    def _pre_swing_gate_hold_for_leg(self, leg_id: int) -> float:
+        if int(leg_id) < 2:
+            return float(self.pre_swing_gate_hold_s)
+        return float(self.rear_pre_swing_gate_hold_s)
 
     def _touchdown_reacquire_hold_for_leg(self, leg_id: int) -> float:
         if int(leg_id) < 2:
@@ -667,7 +706,7 @@ class WBInterface:
         # not block the whole swing window indefinitely if the confirmation
         # never fully clears. Reuse the pre-swing hold as extra wait budget.
         confirm_hold_s = self._support_contact_confirm_hold_for_leg(leg_id)
-        extra_wait_s = max(float(self.pre_swing_gate_hold_s), 0.0)
+        extra_wait_s = max(float(self._pre_swing_gate_hold_for_leg(leg_id)), 0.0)
         return max(float(confirm_hold_s) + extra_wait_s, float(confirm_hold_s))
 
     def _stance_anchor_update_alpha_for_leg(self, leg_id: int) -> float:
@@ -890,6 +929,16 @@ class WBInterface:
         if requested_budget_s <= 0.0:
             return max_budget_s
         return min(float(requested_budget_s), max_budget_s)
+
+    def _contact_latch_steps_for_leg(self, leg_id: int, base_latch_steps: int) -> int:
+        if int(leg_id) < 2:
+            return max(int(base_latch_steps), 0)
+        return max(int(self.rear_contact_latch_steps), 0)
+
+    def _contact_latch_budget_s_for_leg(self, leg_id: int, base_budget_s: float) -> float:
+        if int(leg_id) < 2:
+            return float(base_budget_s)
+        return float(self.rear_contact_latch_budget_s)
 
     def _foot_contact_from_mujoco(self, mujoco_contact) -> np.ndarray:
         actual_contact = np.zeros(4, dtype=int)
@@ -1126,13 +1175,41 @@ class WBInterface:
 
     def _compute_swing_reference(self, leg_id: int, leg_name: str, touch_down) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         swing_time = float(np.clip(self.latched_swing_time[leg_id], 0.0, self.stc.swing_period))
+        early_stance_hitmoment = self.esd.hitmoments[leg_name]
+        early_stance_hitpoint = self.esd.hitpoints[leg_name]
+        if (
+            cfg.mpc_params['type'] == 'linear_osqp'
+            and self.gait_name == 'crawl'
+            and leg_id >= 2
+            and bool(self.rear_crawl_disable_reflex_swing)
+        ):
+            early_stance_hitmoment = -1.0
+            early_stance_hitpoint = None
         des_foot_pos, des_foot_vel, des_foot_acc = self.stc.swing_generator.compute_trajectory_references(
             swing_time,
             self.frg.lift_off_positions[leg_name],
             touch_down,
-            self.esd.hitmoments[leg_name],
-            self.esd.hitpoints[leg_name],
+            early_stance_hitmoment,
+            early_stance_hitpoint,
         )
+        if (
+            cfg.mpc_params['type'] == 'linear_osqp'
+            and self.gait_name == 'crawl'
+            and leg_id >= 2
+            and float(self.rear_crawl_swing_height_scale) < 0.999
+        ):
+            lift_off = np.asarray(self.frg.lift_off_positions[leg_name], dtype=float).reshape(3)
+            touch_down_arr = np.asarray(touch_down, dtype=float).reshape(3)
+            phase = float(np.clip(swing_time / max(float(self.stc.swing_period), 1e-6), 0.0, 1.0))
+            baseline_z = float((1.0 - phase) * lift_off[2] + phase * touch_down_arr[2])
+            baseline_vz = float((touch_down_arr[2] - lift_off[2]) / max(float(self.stc.swing_period), 1e-6))
+            scale = float(self.rear_crawl_swing_height_scale)
+            des_foot_pos = np.asarray(des_foot_pos, dtype=float).reshape(3)
+            des_foot_vel = np.asarray(des_foot_vel, dtype=float).reshape(3)
+            des_foot_acc = np.asarray(des_foot_acc, dtype=float).reshape(3)
+            des_foot_pos[2] = baseline_z + scale * (float(des_foot_pos[2]) - baseline_z)
+            des_foot_vel[2] = baseline_vz + scale * (float(des_foot_vel[2]) - baseline_vz)
+            des_foot_acc[2] = scale * float(des_foot_acc[2])
         return (
             np.asarray(des_foot_pos, dtype=float).reshape(3),
             np.asarray(des_foot_vel, dtype=float).reshape(3),
@@ -1385,11 +1462,12 @@ class WBInterface:
                 for leg_id in range(4):
                     scheduled_swing = bool(contact_sequence[leg_id][0] == 0)
                     confirm_hold_s = self._support_contact_confirm_hold_for_leg(leg_id)
+                    gate_hold_s = self._pre_swing_gate_hold_for_leg(leg_id)
                     if int(self.swing_contact_release_active[leg_id]) == 1:
                         self.support_contact_confirm_elapsed_s[leg_id] = 0.0
                         self.support_contact_confirm_wait_s[leg_id] = 0.0
                         self.support_contact_confirm_bypass_active[leg_id] = 1
-                        self.pre_swing_gate_elapsed_s[leg_id] = float(self.pre_swing_gate_hold_s)
+                        self.pre_swing_gate_elapsed_s[leg_id] = float(gate_hold_s)
                         continue
                     if not scheduled_swing:
                         self.support_contact_confirm_bypass_active[leg_id] = 0
@@ -1449,7 +1527,7 @@ class WBInterface:
                     )
                     if front_late_release:
                         self.front_late_release_active[leg_id] = 1
-                        self.pre_swing_gate_elapsed_s[leg_id] = float(self.pre_swing_gate_hold_s)
+                        self.pre_swing_gate_elapsed_s[leg_id] = float(gate_hold_s)
                         if leg_id < 2:
                             gate_forward_scale = min(gate_forward_scale, requested_front_release_forward_scale)
                         continue
@@ -1462,7 +1540,7 @@ class WBInterface:
                         and scheduled_swing
                         and bool(self.current_contact[leg_id])
                         and bool(actual_contact[leg_id])
-                        and float(self.pre_swing_gate_hold_s) > 1e-9
+                        and float(gate_hold_s) > 1e-9
                         and self._pre_swing_gate_required_margin(leg_id) > 1e-9
                     ):
                         self.pre_swing_gate_elapsed_s[leg_id] = 0.0
@@ -1474,17 +1552,17 @@ class WBInterface:
                     if support_margin >= self._pre_swing_gate_required_margin(leg_id):
                         self.pre_swing_gate_elapsed_s[leg_id] = 0.0
                         continue
-                    if self.pre_swing_gate_elapsed_s[leg_id] >= float(self.pre_swing_gate_hold_s):
+                    if self.pre_swing_gate_elapsed_s[leg_id] >= float(gate_hold_s):
                         continue
 
                     gate_forward_scale = min(gate_forward_scale, requested_gate_forward_scale)
                     self.pre_swing_gate_active[leg_id] = 1
                     self.pre_swing_gate_elapsed_s[leg_id] = min(
                         self.pre_swing_gate_elapsed_s[leg_id] + float(simulation_dt),
-                        float(self.pre_swing_gate_hold_s),
+                        float(gate_hold_s),
                     )
                     remaining_hold_s = max(
-                        float(self.pre_swing_gate_hold_s) - self.pre_swing_gate_elapsed_s[leg_id],
+                        float(gate_hold_s) - self.pre_swing_gate_elapsed_s[leg_id],
                         0.0,
                     )
                     gate_steps = max(int(np.floor(remaining_hold_s / max(self.mpc_dt, 1e-6))) + 1, 1)
@@ -1497,11 +1575,20 @@ class WBInterface:
                 base_latch_steps = min(base_latch_steps, max_latch_steps)
                 latch_budget_s = self._effective_linear_latch_budget_s(latch_budget_s)
             for leg_id in range(4):
+                leg_latch_budget_s = self._contact_latch_budget_s_for_leg(leg_id, latch_budget_s)
+                if cfg.mpc_params['type'] == 'linear_osqp':
+                    leg_latch_budget_s = self._effective_linear_latch_budget_s(leg_latch_budget_s)
+                leg_base_latch_steps = min(
+                    self._contact_latch_steps_for_leg(leg_id, base_latch_steps),
+                    contact_sequence.shape[1],
+                )
+                if cfg.mpc_params['type'] == 'linear_osqp':
+                    leg_base_latch_steps = min(leg_base_latch_steps, self._max_linear_latch_steps())
                 scheduled_swing = contact_sequence[leg_id][0] == 0
                 if int(self.swing_contact_release_active[leg_id]) == 1 and scheduled_swing:
                     self.contact_latch_elapsed_s[leg_id] = max(
                         float(self.contact_latch_elapsed_s[leg_id]),
-                        float(latch_budget_s),
+                        float(leg_latch_budget_s),
                     )
                     self.virtual_unlatch_hold_remaining_s[leg_id] = 0.0
                     continue
@@ -1519,8 +1606,8 @@ class WBInterface:
                     base_ori_euler_xyz=base_ori_euler_xyz,
                 ):
                     self.front_late_release_active[leg_id] = 1
-                    if latch_budget_s > 0.0:
-                        self.contact_latch_elapsed_s[leg_id] = float(latch_budget_s)
+                    if leg_latch_budget_s > 0.0:
+                        self.contact_latch_elapsed_s[leg_id] = float(leg_latch_budget_s)
                     if leg_id < 2:
                         gate_forward_scale = min(gate_forward_scale, requested_front_release_forward_scale)
                     self.virtual_unlatch_hold_remaining_s[leg_id] = max(
@@ -1547,18 +1634,18 @@ class WBInterface:
                     self.virtual_unlatch_hold_remaining_s[leg_id] = float(self.virtual_unlatch_hold_s)
                     continue
 
-                if latch_budget_s > 0.0 and self.contact_latch_elapsed_s[leg_id] >= latch_budget_s:
+                if leg_latch_budget_s > 0.0 and self.contact_latch_elapsed_s[leg_id] >= leg_latch_budget_s:
                     continue
 
                 next_elapsed = self.contact_latch_elapsed_s[leg_id] + float(simulation_dt)
-                if latch_budget_s > 0.0:
-                    self.contact_latch_elapsed_s[leg_id] = min(next_elapsed, latch_budget_s)
+                if leg_latch_budget_s > 0.0:
+                    self.contact_latch_elapsed_s[leg_id] = min(next_elapsed, leg_latch_budget_s)
                 else:
                     self.contact_latch_elapsed_s[leg_id] = next_elapsed
 
-                leg_latch_steps = self._latched_contact_horizon_steps(leg_id, base_latch_steps)
-                if latch_budget_s > 0.0:
-                    remaining_budget_s = max(latch_budget_s - self.contact_latch_elapsed_s[leg_id], 0.0)
+                leg_latch_steps = self._latched_contact_horizon_steps(leg_id, leg_base_latch_steps)
+                if leg_latch_budget_s > 0.0:
+                    remaining_budget_s = max(leg_latch_budget_s - self.contact_latch_elapsed_s[leg_id], 0.0)
                     remaining_budget_steps = max(int(np.floor(remaining_budget_s / max(self.mpc_dt, 1e-6))) + 1, 0)
                     leg_latch_steps = min(leg_latch_steps, remaining_budget_steps)
                 if leg_latch_steps <= 0:
@@ -1601,14 +1688,22 @@ class WBInterface:
                     waiting_for_recontact=waiting_for_recontact,
                 )
                 if not planned_stance:
+                    if int(leg_id) >= 2:
+                        self.rear_touchdown_pending_confirm[leg_id] = int(
+                            waiting_for_recontact and contact_ready
+                        )
                     self.touchdown_reacquire_elapsed_s[leg_id] = 0.0
                     continue
                 if int(self.touchdown_reacquire_armed[leg_id]) != 1:
+                    if int(leg_id) >= 2:
+                        self.rear_touchdown_pending_confirm[leg_id] = 0
                     self.touchdown_reacquire_elapsed_s[leg_id] = 0.0
                     continue
                 if contact_ready:
                     self.touchdown_reacquire_elapsed_s[leg_id] = 0.0
                     continue
+                if int(leg_id) >= 2:
+                    self.rear_touchdown_pending_confirm[leg_id] = 0
                 hold_s = self._touchdown_reacquire_hold_for_leg(leg_id)
                 if hold_s <= 1e-9:
                     continue
@@ -1651,11 +1746,20 @@ class WBInterface:
                 keep_confirm = stance_recontact or bool(prev_touchdown_reacquire_active[leg_id]) or bool(
                     self.touchdown_confirm_elapsed_s[leg_id] > 1e-9
                 )
+                if not keep_confirm and int(leg_id) >= 2:
+                    keep_confirm = bool(
+                        waiting_for_recontact
+                        and planned_stance
+                        and contact_ready
+                        and int(self.rear_touchdown_pending_confirm[leg_id]) == 1
+                    )
                 if not keep_confirm:
                     self.touchdown_confirm_elapsed_s[leg_id] = 0.0
                     continue
 
                 self.touchdown_confirm_active[leg_id] = 1
+                if int(leg_id) >= 2:
+                    self.rear_touchdown_pending_confirm[leg_id] = 0
                 gate_forward_scale = min(gate_forward_scale, float(self.touchdown_confirm_forward_scale))
                 next_confirm_elapsed = min(
                     self.touchdown_confirm_elapsed_s[leg_id] + float(simulation_dt),
@@ -1881,21 +1985,74 @@ class WBInterface:
                 leg_name = self.legs_order[leg_id]
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
-                if (
-                    planned_stance
-                    and self._rear_touchdown_contact_ready(
+                if int(leg_id) >= 2:
+                    waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                    rear_contact_returned_now = bool(actual_contact[leg_id]) and (
+                        not bool(self.previous_actual_contact[leg_id])
+                    )
+                    rear_contact_ready = self._rear_touchdown_contact_ready(
                         leg_id,
                         rear_retry_contact_signal,
                         foot_grf_world=foot_grf_world,
                         current_foot_vz=current_foot_vz,
                         swing_phase=swing_phase,
-                        waiting_for_recontact=bool(int(self.touchdown_reacquire_armed[leg_id]) == 1),
+                        waiting_for_recontact=waiting_for_recontact,
                     )
-                    and int(self.touchdown_reacquire_active[leg_id]) != 1
-                    and int(self.touchdown_confirm_active[leg_id]) != 1
-                    and int(self.touchdown_settle_active[leg_id]) != 1
-                ):
-                    self.touchdown_reacquire_armed[leg_id] = 0
+                    if (
+                        self.gait_name == 'crawl'
+                        and (not planned_stance)
+                        and rear_contact_ready
+                        and (waiting_for_recontact or rear_contact_returned_now)
+                    ):
+                        # In the current crawl branch, a rear foot can regain real
+                        # contact slightly before the controller-side swing window
+                        # fully closes again. Do not snap the gait state here, but
+                        # do reuse the rear touchdown-support window so the wrapper
+                        # can start adding vertical/posture support immediately
+                        # instead of waiting for the slower confirm/settle path.
+                        self.touchdown_settle_remaining_s[leg_id] = max(
+                            float(self.touchdown_settle_remaining_s[leg_id]),
+                            self._touchdown_settle_hold_for_leg(leg_id),
+                        )
+                        self.touchdown_settle_active[leg_id] = 1
+                        self.touchdown_support_active[leg_id] = 1
+                        support_alpha = max(float(support_alpha), 1.0)
+                        rear_support_alpha = max(float(rear_support_alpha), 1.0)
+                        gate_forward_scale = min(gate_forward_scale, float(self.touchdown_settle_forward_scale))
+                    if planned_stance and rear_contact_ready:
+                        # Once rear contact is re-established with enough debounce /
+                        # GRF / downward motion evidence, close the controller-side
+                        # swing immediately instead of keeping the leg stuck in the
+                        # reacquire path behind confirm/settle bookkeeping.
+                        if self.gait_name == 'crawl':
+                            rear_contact_returned_now = bool(actual_contact[leg_id]) and (
+                                not bool(self.previous_actual_contact[leg_id])
+                            )
+                            # When the rear foot finally becomes load-bearing again,
+                            # re-arm the same short settle/support window here as
+                            # well. Without this, crawl can still lose body height
+                            # on the exact step where the controller-side swing
+                            # closes, because the wrapper does not yet see a rear
+                            # touchdown-support phase until later bookkeeping
+                            # catches up.
+                            if waiting_for_recontact and rear_contact_returned_now:
+                                self.touchdown_settle_remaining_s[leg_id] = max(
+                                    float(self.touchdown_settle_remaining_s[leg_id]),
+                                    self._touchdown_settle_hold_for_leg(leg_id),
+                                )
+                                self.touchdown_settle_active[leg_id] = 1
+                                self.touchdown_support_active[leg_id] = 1
+                                support_alpha = max(float(support_alpha), 1.0)
+                                rear_support_alpha = max(float(rear_support_alpha), 1.0)
+                                gate_forward_scale = min(
+                                    gate_forward_scale,
+                                    float(self.touchdown_settle_forward_scale),
+                                )
+                        self.touchdown_reacquire_armed[leg_id] = 0
+                        self.touchdown_reacquire_active[leg_id] = 0
+                        self.touchdown_reacquire_elapsed_s[leg_id] = 0.0
+                        self.rear_touchdown_pending_confirm[leg_id] = 0
+                        contact_sequence[leg_id][0] = 1
             # Rear recontact is the dominant failure mode in the current branch.
             # Even when controller-side swing is already closed again, there can
             # still be a short planned-stance gap where the rear foot is not yet
@@ -1968,12 +2125,19 @@ class WBInterface:
                 rear_transition_active = rear_swing_soon or bool(
                     np.any(np.asarray(self.current_contact[2:4], dtype=int) == 0)
                 )
-                if (not startup_full_stance_active) and front_support_alpha > 1e-9 and rear_swing_soon:
+                front_pair_ready = bool(
+                    np.all(np.asarray(actual_contact[0:2], dtype=int) == 1)
+                    and np.all(np.asarray(contact_sequence[0:2, 0], dtype=int) == 1)
+                )
+                if (not startup_full_stance_active) and (front_support_alpha > 1e-9 or front_pair_ready) and rear_swing_soon:
                     self.rear_handoff_support_mask[:] = 0
-                    self.rear_handoff_support_mask[0:2] = np.asarray(
-                        self.touchdown_support_active[0:2],
-                        dtype=int,
-                    )
+                    if front_pair_ready:
+                        self.rear_handoff_support_mask[0:2] = 1
+                    else:
+                        self.rear_handoff_support_mask[0:2] = np.asarray(
+                            self.touchdown_support_active[0:2],
+                            dtype=int,
+                        )
                     self.rear_handoff_support_remaining_s = max(
                         float(self.rear_handoff_support_remaining_s),
                         handoff_hold_s,
@@ -2024,9 +2188,14 @@ class WBInterface:
                         & (np.asarray(actual_contact[2:4], dtype=int) == 0)
                     )
                 )
+                front_pair_ready = bool(
+                    np.all(np.asarray(actual_contact[0:2], dtype=int) == 1)
+                    and np.all(np.asarray(contact_sequence[0:2, 0], dtype=int) == 1)
+                )
                 recent_front_ok = (
                     front_support_alpha > 1e-9
                     or float(self.rear_swing_bridge_recent_front_remaining_s) > 1e-9
+                    or front_pair_ready
                 )
                 ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
                 height_ratio = float(base_pos_measured[2]) / ref_height
@@ -2065,6 +2234,14 @@ class WBInterface:
                         self.touchdown_support_active[leg_id] = 1
                         support_alpha = 1.0
                         front_support_alpha = 1.0
+            if int(self.full_contact_recovery_active) == 1:
+                # Full-contact recovery is meant to keep the front touchdown-style
+                # support overrides alive briefly after all feet have come back.
+                # Without routing a non-zero support alpha through the wrapper, the
+                # controller slows down but never actually raises the extra height /
+                # posture support gains that the recovery hold is supposed to reuse.
+                support_alpha = max(float(support_alpha), float(self.full_contact_recovery_alpha))
+                front_support_alpha = max(float(front_support_alpha), float(self.full_contact_recovery_alpha))
             if np.any(np.asarray(self.touchdown_support_active[2:4], dtype=int) == 1):
                 rear_support_alpha = max(float(rear_support_alpha), float(support_alpha))
             self.touchdown_support_alpha = float(support_alpha)
@@ -2401,24 +2578,43 @@ class WBInterface:
                             float(self.stc.swing_time[leg_id]),
                             min_phase * float(self.stc.swing_period),
                         )
-                tau[leg_name], des_foot_pos[leg_name], des_foot_vel[leg_name] = (
-                    self.stc.compute_swing_control_cartesian_space(
+                if cfg.mpc_params['type'] == 'linear_osqp' and self.gait_name == 'crawl':
+                    if swing_time_override is not None:
+                        self.latched_swing_time[leg_id] = min(
+                            float(swing_time_override),
+                            float(self.stc.swing_period),
+                        )
+                    tau[leg_name], des_foot_pos[leg_name], des_foot_vel[leg_name] = self._compute_latched_swing_torque(
                         leg_id=leg_id,
+                        leg_name=leg_name,
                         q_dot=qvel[legs_qvel_idx[leg_name]],
                         J=feet_jac[leg_name][:, legs_qvel_idx[leg_name]],
                         J_dot=feet_jac_dot[leg_name][:, legs_qvel_idx[leg_name]],
-                        lift_off=self.frg.lift_off_positions[leg_name],
                         touch_down=swing_touch_down,
                         foot_pos=feet_pos[leg_name],
                         foot_vel=feet_vel[leg_name],
-                        passive_force=legs_qfrc_passive[leg_name],
                         h=legs_qfrc_bias[leg_name],
                         mass_matrix=legs_mass_matrix[leg_name],
-                        early_stance_hitmoments=self.esd.hitmoments[leg_name],
-                        early_stance_hitpoints=self.esd.hitpoints[leg_name],
-                        swing_time_override=swing_time_override,
                     )
-                )
+                else:
+                    tau[leg_name], des_foot_pos[leg_name], des_foot_vel[leg_name] = (
+                        self.stc.compute_swing_control_cartesian_space(
+                            leg_id=leg_id,
+                            q_dot=qvel[legs_qvel_idx[leg_name]],
+                            J=feet_jac[leg_name][:, legs_qvel_idx[leg_name]],
+                            J_dot=feet_jac_dot[leg_name][:, legs_qvel_idx[leg_name]],
+                            lift_off=self.frg.lift_off_positions[leg_name],
+                            touch_down=swing_touch_down,
+                            foot_pos=feet_pos[leg_name],
+                            foot_vel=feet_vel[leg_name],
+                            passive_force=legs_qfrc_passive[leg_name],
+                            h=legs_qfrc_bias[leg_name],
+                            mass_matrix=legs_mass_matrix[leg_name],
+                            early_stance_hitmoments=self.esd.hitmoments[leg_name],
+                            early_stance_hitpoints=self.esd.hitpoints[leg_name],
+                            swing_time_override=swing_time_override,
+                        )
+                    )
                 if leg_id >= 2 and int(self.touchdown_reacquire_active[leg_id]) == 1:
                     upward_vel_damping = float(self.rear_touchdown_reacquire_upward_vel_damping)
                     if int(self.rear_touchdown_retry_count[leg_id]) > 0:
@@ -2447,6 +2643,30 @@ class WBInterface:
                                 )
                                 des_foot_pos[leg_name][2] = min(float(des_foot_pos[leg_name][2]), retry_target_z)
                                 des_foot_vel[leg_name][2] = min(float(des_foot_vel[leg_name][2]), 0.0)
+                if (
+                    leg_id >= 2
+                    and int(self.swing_contact_release_active[leg_id]) == 1
+                    and bool(actual_contact[leg_id])
+                ):
+                    release_lift_height = float(self.rear_release_lift_height)
+                    release_lift_kp = float(self.rear_release_lift_kp)
+                    release_lift_kd = float(self.rear_release_lift_kd)
+                    if release_lift_height > 1e-9 and (release_lift_kp > 1e-9 or release_lift_kd > 1e-9):
+                        current_foot_xyz = np.asarray(feet_pos[leg_name], dtype=float).reshape(3)
+                        current_foot_vz = float(np.asarray(feet_vel[leg_name], dtype=float).reshape(3)[2])
+                        release_target_z = max(
+                            float(np.asarray(des_foot_pos[leg_name], dtype=float).reshape(3)[2]),
+                            float(current_foot_xyz[2]) + release_lift_height,
+                        )
+                        z_err = release_target_z - float(current_foot_xyz[2])
+                        lift_force_z = release_lift_kp * z_err - release_lift_kd * current_foot_vz
+                        if lift_force_z > 0.0:
+                            lift_force = np.array([0.0, 0.0, lift_force_z], dtype=float)
+                            tau[leg_name] += (
+                                feet_jac[leg_name][:, legs_qvel_idx[leg_name]].T @ lift_force
+                            )
+                            des_foot_pos[leg_name][2] = release_target_z
+                            des_foot_vel[leg_name][2] = max(float(des_foot_vel[leg_name][2]), 0.0)
             else:
                 if cfg.mpc_params['type'] == 'linear_osqp':
                     # Holding the stance foot near its touchdown location avoids
@@ -2682,6 +2902,7 @@ class WBInterface:
         self.touchdown_confirm_active = np.zeros(4, dtype=int)
         self.touchdown_settle_active = np.zeros(4, dtype=int)
         self.touchdown_support_active = np.zeros(4, dtype=int)
+        self.rear_touchdown_pending_confirm = np.zeros(4, dtype=int)
         self.front_margin_rescue_active = np.zeros(4, dtype=int)
         self.touchdown_support_alpha = 0.0
         self.front_touchdown_support_alpha = 0.0

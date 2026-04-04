@@ -256,7 +256,8 @@ linear_osqp_params = {
     'dynamic_fy_roll_ref': 0.20,  # roll angle [rad] that saturates the temporary lateral-force boost
     'grf_max_scale': 0.35,       # effective fz upper bound as fraction of body weight per leg total budget
     'support_force_floor_ratio': 0.0,  # minimum share of body weight kept on each stance leg
-    'joint_pd_scale': 0.25,      # blend-in low-level joint PD to help realize foothold geometry in torque control
+    'joint_pd_scale': 0.25,      # blend-in low-level joint PD on swing legs to help realize foothold geometry in torque control
+    'stance_joint_pd_scale': 0.0,  # optional reduced joint PD kept on stance legs while swing legs use the higher swing blend
     'latched_joint_pd_scale': 0.25,  # optional reduced joint PD for planned-swing legs kept relatched in contact
     'latched_release_phase_start': 0.0,  # optional swing-progress window start for relaxing relatched planned-swing legs
     'latched_release_phase_end': 1.0,  # optional swing-progress window end for relaxing relatched planned-swing legs
@@ -284,6 +285,7 @@ linear_osqp_params = {
     'pre_swing_gate_min_margin': 0.015,  # keep a scheduled swing leg grounded until the upcoming 3-leg support polygon has this much margin
     'front_pre_swing_gate_min_margin': None,  # optional front-leg override for the required support margin before lift-off
     'rear_pre_swing_gate_min_margin': None,  # optional rear-leg override for the required support margin before lift-off
+    'rear_pre_swing_gate_hold_s': None,  # optional rear-leg override for how long the pre-swing gate may keep lift-off delayed
     'support_contact_confirm_hold_s': 0.0,  # require support contacts to stay ready this long before allowing a scheduled swing
     'front_support_contact_confirm_hold_s': None,  # optional front-leg override for support-contact confirmation hold
     'rear_support_contact_confirm_hold_s': None,  # optional rear-leg override for support-contact confirmation hold
@@ -301,6 +303,9 @@ linear_osqp_params = {
     'swing_contact_release_timeout_s': 0.0,  # if a planned swing leg remains physically stuck in contact, stop re-latching it forever after this timeout
     'front_swing_contact_release_timeout_s': None,  # optional front-leg override for planned-swing contact release timeout
     'rear_swing_contact_release_timeout_s': None,  # optional rear-leg override for planned-swing contact release timeout
+    'rear_release_lift_height': 0.0,  # temporary extra upward swing target [m] applied when a rear swing leg remains physically stuck in contact
+    'rear_release_lift_kp': 0.0,  # task-space z gain used by the rear forced-release lift assist
+    'rear_release_lift_kd': 0.0,  # task-space z damping used by the rear forced-release lift assist
     'front_late_release_extra_margin': 0.0,  # extra safety margin added on top of the front late-release minimum support margin
     'front_late_release_pitch_guard': None,  # optional abs pitch limit [rad] for opening the front late-release path
     'front_late_release_roll_guard': None,  # optional abs roll limit [rad] for opening the front late-release path
@@ -330,6 +335,8 @@ linear_osqp_params = {
     'rear_touchdown_contact_min_phase': 0.0,  # require rear swing phase to reach at least this value before controller-side contact may close on touchdown
     'rear_touchdown_contact_max_upward_vel': None,  # optional max allowed upward rear foot z velocity [m/s] before controller-side contact may close on touchdown
     'rear_touchdown_contact_min_grf_z': 0.0,  # require at least this upward world-frame GRF [N] before rear touchdown is treated as truly load-bearing
+    'rear_crawl_disable_reflex_swing': False,  # ignore early-stance reflex swing shaping on rear legs during crawl
+    'rear_crawl_swing_height_scale': 1.0,  # scale rear-leg crawl swing vertical excursion relative to the nominal trajectory
     'stance_anchor_update_alpha': 0.0,  # continuously relax stance touchdown anchors toward actual contacted foot position
     'front_stance_anchor_update_alpha': None,  # optional front-leg override for stance anchor update alpha
     'rear_stance_anchor_update_alpha': None,  # optional rear-leg override for stance anchor update alpha
@@ -347,17 +354,22 @@ linear_osqp_params = {
     'touchdown_settle_forward_scale': 1.0,  # scale forward reference velocity during the post-touchdown settling window
     'touchdown_support_rear_floor_delta': 0.0,  # temporary extra rear-load floor applied while front touchdown confirm/settle is active
     'touchdown_support_vertical_boost': 0.0,  # temporary extra body-weight-scaled lift request during front touchdown support
+    'touchdown_support_min_vertical_force_scale_delta': 0.0,  # raise minimum vertical-force intent during front touchdown support
+    'touchdown_support_grf_max_scale_delta': 0.0,  # temporarily raise GRF headroom during front touchdown support
     'touchdown_support_z_pos_gain_delta': 0.0,  # temporary extra height gain during front touchdown support
     'touchdown_support_roll_angle_gain_delta': 0.0,  # temporary extra roll-angle gain during front touchdown support
     'touchdown_support_roll_rate_gain_delta': 0.0,  # temporary extra roll-rate gain during front touchdown support
     'touchdown_support_pitch_angle_gain_delta': 0.0,  # temporary extra pitch-angle gain during front touchdown support
     'touchdown_support_pitch_rate_gain_delta': 0.0,  # temporary extra pitch-rate gain during front touchdown support
     'touchdown_support_side_rebalance_delta': 0.0,  # temporary extra signed left/right load rebalance during front touchdown support
+    'touchdown_support_front_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on front support legs during front touchdown support
     'touchdown_support_rear_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on rear support legs during front touchdown support
     'touchdown_support_anchor_xy_blend': 0.0,  # blend a front touchdown support leg's stance target toward the actual contacted foot xy location
     'touchdown_support_anchor_z_blend': 0.0,  # blend a front touchdown support leg's stance target height toward the actual contacted foot z location
     'rear_touchdown_support_support_floor_delta': 0.0,  # temporary extra all-stance support floor applied while rear touchdown support is active
     'rear_touchdown_support_vertical_boost': 0.0,  # temporary extra body-weight-scaled lift request during rear touchdown support
+    'rear_touchdown_support_min_vertical_force_scale_delta': 0.0,  # raise minimum vertical-force intent during rear touchdown support
+    'rear_touchdown_support_grf_max_scale_delta': 0.0,  # temporarily raise GRF headroom during rear touchdown support
     'rear_touchdown_support_z_pos_gain_delta': 0.0,  # temporary extra height gain during rear touchdown support
     'rear_touchdown_support_roll_angle_gain_delta': 0.0,  # temporary extra roll-angle gain during rear touchdown support
     'rear_touchdown_support_roll_rate_gain_delta': 0.0,  # temporary extra roll-rate gain during rear touchdown support
@@ -365,6 +377,7 @@ linear_osqp_params = {
     'rear_touchdown_support_pitch_rate_gain_delta': 0.0,  # temporary extra pitch-rate gain during rear touchdown support
     'rear_touchdown_support_side_rebalance_delta': 0.0,  # temporary extra signed left/right load rebalance during rear touchdown support
     'rear_touchdown_support_front_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on front support legs during rear touchdown support
+    'rear_touchdown_support_rear_joint_pd_scale': 0.0,  # extra low-gain joint PD applied only on rear support legs during rear touchdown support
     'touchdown_contact_vel_z_damping': 0.0,  # task-space vertical damping applied during touchdown support windows
     'front_touchdown_contact_vel_z_damping': None,  # optional front-leg override for touchdown vertical damping
     'rear_touchdown_contact_vel_z_damping': None,  # optional rear-leg override for touchdown vertical damping
@@ -414,8 +427,10 @@ linear_osqp_params = {
     'latched_swing_lift_ratio': 0.0,  # raise a relatched swing leg a fraction of step height to help break contact
     'latched_swing_tau_blend': 0.0,  # blend a relatched planned-swing leg toward swing-space torque during the release window
     'contact_latch_steps': 6,  # base number of contact-sequence steps a planned-swing leg may stay relatched
+    'rear_contact_latch_steps': None,  # optional rear-leg override for the planned-swing relatch horizon
     'contact_latch_budget_steps': 0,  # legacy controller-step budget; time-based config below takes precedence when set
     'contact_latch_budget_s': None,  # relatched-support budget in seconds; None falls back to legacy controller-step conversion
+    'rear_contact_latch_budget_s': None,  # optional rear-leg override for the planned-swing relatch budget in seconds
     'startup_full_stance_steps': 15,  # legacy controller-step warmup; time-based config below takes precedence when set
     'startup_full_stance_time_s': None,  # full-stance warmup in seconds; None falls back to legacy controller-step conversion
     'virtual_unlatch_phase_threshold': 1.1,  # >1 disables; otherwise force controller-side swing once phase is advanced enough

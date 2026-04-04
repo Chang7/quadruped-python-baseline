@@ -23,8 +23,18 @@ during rear touchdown/recontact.
   here.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
-- The main remaining gap is still in contact transition quality, especially
-  rear touchdown/recontact and post-touchdown stabilization in `crawl`.
+- The default `crawl` diagnostic now completes a 4-second run without
+  termination, after tightening rear swing / handoff behavior and adding a
+  small front touchdown-support PD blend on the front legs.
+- A longer 10-second `crawl` stress test now reaches roughly the 4.8-second
+  mark before failure after strengthening rear planned-swing relatch and
+  slightly tightening rear touchdown debounce, so the current `crawl` result
+  should still be read as a diagnostic horizon milestone rather than a fully
+  solved gait.
+- The main remaining gap is now more about motion quality and long-horizon
+  contact-transition robustness than basic viability: `trot` still shows a
+  larger pitch bias than the stock baseline, and `crawl` still relies on strong
+  support/recovery windows.
 
 ## Repository Layout
 
@@ -95,10 +105,16 @@ Short custom `linear_osqp` `trot`:
 python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
 ```
 
-Current `crawl` diagnostic:
+Current default `crawl` diagnostic:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl
+python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 4 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl
+```
+
+Longer `crawl` stress check:
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 10 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl_long
 ```
 
 The main contact-transition logic is currently concentrated in:

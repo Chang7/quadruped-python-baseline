@@ -71,6 +71,18 @@ class QuadrupedPyMPC_Wrapper:
         if front_alpha > 1e-9:
             _raise_from_backup("rear_floor_base_scale", front_alpha * float(backup.get("touchdown_support_rear_floor_delta", 0.0)), lower=0.0, upper=1.5)
             _raise_from_backup("reduced_support_vertical_boost", front_alpha * float(backup.get("touchdown_support_vertical_boost", 0.0)), lower=0.0)
+            _raise_from_backup(
+                "min_vertical_force_scale",
+                front_alpha * float(backup.get("touchdown_support_min_vertical_force_scale_delta", 0.0)),
+                lower=0.0,
+                upper=2.0,
+            )
+            _raise_from_backup(
+                "grf_max_scale",
+                front_alpha * float(backup.get("touchdown_support_grf_max_scale_delta", 0.0)),
+                lower=0.0,
+                upper=1.0,
+            )
             _raise_from_backup("z_pos_gain", front_alpha * float(backup.get("touchdown_support_z_pos_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("roll_angle_gain", front_alpha * float(backup.get("touchdown_support_roll_angle_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("roll_rate_gain", front_alpha * float(backup.get("touchdown_support_roll_rate_gain_delta", 0.0)), lower=0.0)
@@ -81,6 +93,18 @@ class QuadrupedPyMPC_Wrapper:
         if rear_alpha > 1e-9:
             _raise_from_backup("support_force_floor_ratio", rear_alpha * float(backup.get("rear_touchdown_support_support_floor_delta", 0.0)), lower=0.0, upper=1.0)
             _raise_from_backup("reduced_support_vertical_boost", rear_alpha * float(backup.get("rear_touchdown_support_vertical_boost", 0.0)), lower=0.0)
+            _raise_from_backup(
+                "min_vertical_force_scale",
+                rear_alpha * float(backup.get("rear_touchdown_support_min_vertical_force_scale_delta", 0.0)),
+                lower=0.0,
+                upper=2.0,
+            )
+            _raise_from_backup(
+                "grf_max_scale",
+                rear_alpha * float(backup.get("rear_touchdown_support_grf_max_scale_delta", 0.0)),
+                lower=0.0,
+                upper=1.0,
+            )
             _raise_from_backup("z_pos_gain", rear_alpha * float(backup.get("rear_touchdown_support_z_pos_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("roll_angle_gain", rear_alpha * float(backup.get("rear_touchdown_support_roll_angle_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("roll_rate_gain", rear_alpha * float(backup.get("rear_touchdown_support_roll_rate_gain_delta", 0.0)), lower=0.0)
@@ -258,20 +282,24 @@ class QuadrupedPyMPC_Wrapper:
         kp_joint_motor = cfg.simulation_params['impedence_joint_position_gain']
         kd_joint_motor = cfg.simulation_params['impedence_joint_velocity_gain']
         pd_scale = 0.0
+        stance_pd_scale = 0.0
         latched_pd_scale = 0.0
         if cfg.mpc_params['type'] == 'linear_osqp':
-            pd_scale = float(getattr(cfg, 'linear_osqp_params', {}).get('joint_pd_scale', 0.0))
-            latched_pd_scale = float(getattr(cfg, 'linear_osqp_params', {}).get('latched_joint_pd_scale', pd_scale))
-        if pd_scale > 0.0:
+            linear_params = getattr(cfg, 'linear_osqp_params', {})
+            pd_scale = float(linear_params.get('joint_pd_scale', 0.0))
+            stance_pd_scale = float(linear_params.get('stance_joint_pd_scale', 0.0))
+            latched_pd_scale = float(linear_params.get('latched_joint_pd_scale', pd_scale))
+        if pd_scale > 0.0 or stance_pd_scale > 0.0:
             for leg_id, leg in enumerate(legs_order):
-                leg_pd_scale = pd_scale
-                if (
-                    cfg.mpc_params['type'] == 'linear_osqp'
-                    and int(self.wb_interface.planned_contact[leg_id]) == 0
-                    and int(self.wb_interface.current_contact[leg_id]) == 1
-                ):
-                    release_alpha = self.wb_interface.get_latched_release_alpha(leg_id)
-                    leg_pd_scale = pd_scale + release_alpha * (latched_pd_scale - pd_scale)
+                leg_pd_scale = stance_pd_scale
+                if cfg.mpc_params['type'] == 'linear_osqp':
+                    planned_contact = int(self.wb_interface.planned_contact[leg_id])
+                    current_contact = int(self.wb_interface.current_contact[leg_id])
+                    if planned_contact == 0 and current_contact == 0:
+                        leg_pd_scale = pd_scale
+                    elif planned_contact == 0 and current_contact == 1:
+                        release_alpha = self.wb_interface.get_latched_release_alpha(leg_id)
+                        leg_pd_scale = stance_pd_scale + release_alpha * (latched_pd_scale - stance_pd_scale)
                 if leg_pd_scale <= 0.0:
                     continue
                 tau[leg] += leg_pd_scale * (
@@ -281,6 +309,19 @@ class QuadrupedPyMPC_Wrapper:
         if cfg.mpc_params['type'] == 'linear_osqp':
             front_support_alpha = float(getattr(self.wb_interface, 'front_touchdown_support_alpha', 0.0))
             rear_support_alpha = float(getattr(self.wb_interface, 'rear_touchdown_support_alpha', 0.0))
+            front_support_pd_scale = front_support_alpha * float(
+                getattr(cfg, 'linear_osqp_params', {}).get('touchdown_support_front_joint_pd_scale', 0.0)
+            )
+            if front_support_pd_scale > 0.0:
+                for leg_id, leg in enumerate(legs_order):
+                    if leg_id >= 2:
+                        continue
+                    if int(self.wb_interface.current_contact[leg_id]) != 1:
+                        continue
+                    tau[leg] += front_support_pd_scale * (
+                        kp_joint_motor * (des_joints_pos[leg] - qpos[legs_qpos_idx[leg]])
+                        + kd_joint_motor * (des_joints_vel[leg] - qvel[legs_qvel_idx[leg]])
+                    )
             rear_support_pd_scale = front_support_alpha * float(
                 getattr(cfg, 'linear_osqp_params', {}).get('touchdown_support_rear_joint_pd_scale', 0.0)
             )
@@ -304,6 +345,19 @@ class QuadrupedPyMPC_Wrapper:
                     if int(self.wb_interface.current_contact[leg_id]) != 1:
                         continue
                     tau[leg] += front_support_pd_scale * (
+                        kp_joint_motor * (des_joints_pos[leg] - qpos[legs_qpos_idx[leg]])
+                        + kd_joint_motor * (des_joints_vel[leg] - qvel[legs_qvel_idx[leg]])
+                    )
+            rear_support_pd_scale = rear_support_alpha * float(
+                getattr(cfg, 'linear_osqp_params', {}).get('rear_touchdown_support_rear_joint_pd_scale', 0.0)
+            )
+            if rear_support_pd_scale > 0.0:
+                for leg_id, leg in enumerate(legs_order):
+                    if leg_id < 2:
+                        continue
+                    if int(self.wb_interface.current_contact[leg_id]) != 1:
+                        continue
+                    tau[leg] += rear_support_pd_scale * (
                         kp_joint_motor * (des_joints_pos[leg] - qpos[legs_qpos_idx[leg]])
                         + kd_joint_motor * (des_joints_vel[leg] - qvel[legs_qvel_idx[leg]])
                     )
