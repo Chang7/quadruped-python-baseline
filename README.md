@@ -23,16 +23,15 @@ during rear touchdown/recontact.
   here.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
-- The default `crawl` diagnostic now completes a 4-second run without
-  termination, after tightening rear swing / handoff behavior and adding a
-  small front touchdown-support PD blend on the front legs.
-- A longer 10-second `crawl` stress test now reaches roughly the 4.8-second
-  mark before failure. The current best-known default uses a dedicated
-  rear-transition helper plus a stricter rear touchdown acceptance rule
-  (slightly longer debounce, later swing-phase requirement, smaller allowed
-  upward foot velocity, and higher minimum GRF before accepting contact), so
-  the current `crawl` result should still be read as a diagnostic horizon
-  milestone rather than a fully solved gait.
+- The current conservative `crawl` default now reaches roughly the 8-second
+  mark in a 10-second stress test before failure. The most recent improvement
+  came from treating the late rear all-contact seam more locally: instead of a
+  broad stance-anchor blend, the front stance-foot target height is capped only
+  during the rear late all-contact stabilization window.
+- The remaining `crawl` failure should now be read as a late-horizon
+  stabilization problem rather than an early rear recontact failure. The robot
+  still settles into a low all-contact posture and eventually drifts into a
+  front-hip invalid contact.
 - The main remaining gap is now more about motion quality and long-horizon
   contact-transition robustness than basic viability: `trot` still shows a
   larger pitch bias than the stock baseline, and `crawl` still relies on strong
@@ -118,6 +117,11 @@ Longer `crawl` stress check:
 ```bash
 python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 10 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl_long
 ```
+
+Latest locally validated outputs:
+
+- `outputs/curated_runs/crawl_rearallcontact_zcap_default_10s/`
+- `outputs/curated_runs/trot_after_rearallcontact_zcap_default_3s/`
 
 The main contact-transition logic is currently concentrated in:
 

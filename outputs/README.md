@@ -12,7 +12,10 @@ committed to GitHub.
   - milestone runs and current validated defaults
   - keep the latest "known-good" crawl/trot runs here so future changes always
     have a clear comparison point
-  - current rear-transition-manager-based defaults:
+  - current late-rear-all-contact defaults:
+    - `crawl_rearallcontact_zcap_default_10s/`
+    - `trot_after_rearallcontact_zcap_default_3s/`
+  - earlier rear-transition-manager milestone:
     - `crawl_rear_transition_manager_default_10s/`
     - `trot_rear_transition_manager_default_3s/`
 - `report_progress_explainer/`

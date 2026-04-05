@@ -48,12 +48,19 @@ class QuadrupedPyMPC_Wrapper:
         self.quadrupedpympc_observables = {}
 
     @staticmethod
-    def _apply_linear_touchdown_support_overrides(front_alpha: float, rear_alpha: float) -> dict | None:
+    def _apply_linear_touchdown_support_overrides(
+        front_alpha: float,
+        rear_alpha: float,
+        recovery_alpha: float = 0.0,
+        rear_all_contact_alpha: float = 0.0,
+    ) -> dict | None:
         if cfg.mpc_params['type'] != 'linear_osqp':
             return None
         front_alpha = float(np.clip(front_alpha, 0.0, 1.0))
         rear_alpha = float(np.clip(rear_alpha, 0.0, 1.0))
-        if max(front_alpha, rear_alpha) <= 1e-9:
+        recovery_alpha = float(np.clip(recovery_alpha, 0.0, 1.0))
+        rear_all_contact_alpha = float(np.clip(rear_all_contact_alpha, 0.0, 1.0))
+        if max(front_alpha, rear_alpha, recovery_alpha, rear_all_contact_alpha) <= 1e-9:
             return None
         if not isinstance(getattr(cfg, 'linear_osqp_params', None), dict):
             return None
@@ -111,6 +118,72 @@ class QuadrupedPyMPC_Wrapper:
             _raise_from_backup("pitch_angle_gain", rear_alpha * float(backup.get("rear_touchdown_support_pitch_angle_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("pitch_rate_gain", rear_alpha * float(backup.get("rear_touchdown_support_pitch_rate_gain_delta", 0.0)), lower=0.0)
             _raise_from_backup("side_rebalance_gain", rear_alpha * float(backup.get("rear_touchdown_support_side_rebalance_delta", 0.0)), lower=0.0)
+
+        if recovery_alpha > 1e-9:
+            _raise_from_backup(
+                "support_force_floor_ratio",
+                recovery_alpha * float(backup.get("full_contact_recovery_support_floor_delta", 0.0)),
+                lower=0.0,
+                upper=1.0,
+            )
+            _raise_from_backup(
+                "min_vertical_force_scale",
+                recovery_alpha * float(backup.get("full_contact_recovery_min_vertical_force_scale_delta", 0.0)),
+                lower=0.0,
+                upper=2.0,
+            )
+            _raise_from_backup(
+                "z_pos_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_z_pos_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_angle_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_roll_angle_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_rate_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_roll_rate_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "pitch_angle_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_pitch_angle_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "pitch_rate_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_pitch_rate_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "side_rebalance_gain",
+                recovery_alpha * float(backup.get("full_contact_recovery_side_rebalance_delta", 0.0)),
+                lower=0.0,
+            )
+
+        if rear_all_contact_alpha > 1e-9:
+            _raise_from_backup(
+                "z_pos_gain",
+                rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_z_pos_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_angle_gain",
+                rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_roll_angle_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_rate_gain",
+                rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_roll_rate_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "side_rebalance_gain",
+                rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_side_rebalance_delta", 0.0)),
+                lower=0.0,
+            )
 
         return backup
 
@@ -208,7 +281,16 @@ class QuadrupedPyMPC_Wrapper:
             if cfg.mpc_params['type'] == 'linear_osqp':
                 front_support_alpha = float(getattr(self.wb_interface, 'front_touchdown_support_alpha', 0.0))
                 rear_support_alpha = float(getattr(self.wb_interface, 'rear_touchdown_support_alpha', 0.0))
-                support_override_backup = self._apply_linear_touchdown_support_overrides(front_support_alpha, rear_support_alpha)
+                recovery_alpha = float(getattr(self.wb_interface, 'full_contact_recovery_alpha', 0.0))
+                rear_all_contact_alpha = float(
+                    getattr(self.wb_interface, 'rear_all_contact_stabilization_alpha', 0.0)
+                )
+                support_override_backup = self._apply_linear_touchdown_support_overrides(
+                    front_support_alpha,
+                    rear_support_alpha,
+                    recovery_alpha,
+                    rear_all_contact_alpha,
+                )
             try:
                 (
                     self.nmpc_GRFs,
