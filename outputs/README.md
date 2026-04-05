@@ -13,8 +13,8 @@ committed to GitHub.
   - keep the latest "known-good" crawl/trot runs here so future changes always
     have a clear comparison point
   - current late-rear-all-contact defaults:
-    - `crawl_rearallcontact_zcap_default_10s/`
-    - `trot_after_rearallcontact_zcap_default_3s/`
+    - `crawl_rearallcontact_rearfloor_default_10s/`
+    - `trot_after_rearallcontact_rearfloor_default_3s/`
   - earlier rear-transition-manager milestone:
     - `crawl_rear_transition_manager_default_10s/`
     - `trot_rear_transition_manager_default_3s/`
@@ -39,6 +39,10 @@ committed to GitHub.
     first focused sweep after splitting the rear touchdown / recontact logic
     into a dedicated helper, including stricter vs. looser rear contact
     acceptance and short rear-settle/support variants
+  - `archive/raw_runs/tmp_continue/20260405_late_rear_allcontact_followup/`
+    keeps the later late-rear-all-contact follow-up that identified the current
+    best default sweet spot: lower front touchdown-support alpha together with a
+    temporary rear-load floor bias during the rear late all-contact window
 
 ## Suggested Reading Order
 

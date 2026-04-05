@@ -165,6 +165,12 @@ class QuadrupedPyMPC_Wrapper:
 
         if rear_all_contact_alpha > 1e-9:
             _raise_from_backup(
+                "rear_floor_base_scale",
+                rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_rear_floor_delta", 0.0)),
+                lower=0.0,
+                upper=1.5,
+            )
+            _raise_from_backup(
                 "z_pos_gain",
                 rear_all_contact_alpha * float(backup.get("rear_all_contact_stabilization_z_pos_gain_delta", 0.0)),
                 lower=0.0,

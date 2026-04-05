@@ -23,15 +23,15 @@ during rear touchdown/recontact.
   here.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
-- The current conservative `crawl` default now reaches roughly the 8-second
+- The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
-  came from treating the late rear all-contact seam more locally: instead of a
-  broad stance-anchor blend, the front stance-foot target height is capped only
-  during the rear late all-contact stabilization window.
+  came from treating the late rear all-contact seam more locally: during the
+  rear late all-contact stabilization window, the front touchdown-support alpha
+  is reduced while a temporary rear-load floor bias is applied.
 - The remaining `crawl` failure should now be read as a late-horizon
   stabilization problem rather than an early rear recontact failure. The robot
   still settles into a low all-contact posture and eventually drifts into a
-  front-hip invalid contact.
+  rear-hip invalid contact.
 - The main remaining gap is now more about motion quality and long-horizon
   contact-transition robustness than basic viability: `trot` still shows a
   larger pitch bias than the stock baseline, and `crawl` still relies on strong
@@ -120,8 +120,8 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 
 Latest locally validated outputs:
 
-- `outputs/curated_runs/crawl_rearallcontact_zcap_default_10s/`
-- `outputs/curated_runs/trot_after_rearallcontact_zcap_default_3s/`
+- `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
+- `outputs/curated_runs/trot_after_rearallcontact_rearfloor_default_3s/`
 
 The main contact-transition logic is currently concentrated in:
 
