@@ -422,10 +422,14 @@ def main() -> None:
                         "rear_touchdown_reacquire_hold_current_xy": True,
                         "rear_touchdown_reacquire_max_xy_shift": 0.015,
                         "rear_touchdown_reacquire_min_phase": 0.55,
-                        "rear_touchdown_contact_debounce_s": 0.01,
-                        "rear_touchdown_contact_min_phase": 0.55,
-                        "rear_touchdown_contact_max_upward_vel": 0.05,
-                        "rear_touchdown_contact_min_grf_z": 6.0,
+                        # Rear crawl failures still come from a weak first
+                        # touchdown being accepted too early. Keep the
+                        # controller-side rear swing open until the returning
+                        # contact is a little more clearly load-bearing.
+                        "rear_touchdown_contact_debounce_s": 0.015,
+                        "rear_touchdown_contact_min_phase": 0.60,
+                        "rear_touchdown_contact_max_upward_vel": 0.03,
+                        "rear_touchdown_contact_min_grf_z": 8.0,
                         "front_stance_dropout_reacquire": False,
                         "rear_stance_dropout_reacquire": True,
                         "pre_swing_gate_hold_s": 0.04,

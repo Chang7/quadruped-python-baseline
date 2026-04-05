@@ -12,6 +12,9 @@ committed to GitHub.
   - milestone runs and current validated defaults
   - keep the latest "known-good" crawl/trot runs here so future changes always
     have a clear comparison point
+  - current rear-transition-manager-based defaults:
+    - `crawl_rear_transition_manager_default_10s/`
+    - `trot_rear_transition_manager_default_3s/`
 - `report_progress_explainer/`
   - current email/meeting/report assets
 - `stock_stack_runs/`
@@ -29,6 +32,10 @@ committed to GitHub.
   - `archive/raw_runs/20260404_rear_touchdown_search/` keeps the later
     rear-relatch-focused crawl search, including the rejected rear-leg PD /
     touchdown-damping follow-up probes
+  - `archive/raw_runs/20260405_rear_transition_manager_search/` keeps the
+    first focused sweep after splitting the rear touchdown / recontact logic
+    into a dedicated helper, including stricter vs. looser rear contact
+    acceptance and short rear-settle/support variants
 
 ## Suggested Reading Order
 

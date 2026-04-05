@@ -27,10 +27,12 @@ during rear touchdown/recontact.
   termination, after tightening rear swing / handoff behavior and adding a
   small front touchdown-support PD blend on the front legs.
 - A longer 10-second `crawl` stress test now reaches roughly the 4.8-second
-  mark before failure after strengthening rear planned-swing relatch and
-  slightly tightening rear touchdown debounce, so the current `crawl` result
-  should still be read as a diagnostic horizon milestone rather than a fully
-  solved gait.
+  mark before failure. The current best-known default uses a dedicated
+  rear-transition helper plus a stricter rear touchdown acceptance rule
+  (slightly longer debounce, later swing-phase requirement, smaller allowed
+  upward foot velocity, and higher minimum GRF before accepting contact), so
+  the current `crawl` result should still be read as a diagnostic horizon
+  milestone rather than a fully solved gait.
 - The main remaining gap is now more about motion quality and long-horizon
   contact-transition robustness than basic viability: `trot` still shows a
   larger pitch bias than the stock baseline, and `crawl` still relies on strong
@@ -119,6 +121,7 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 
 The main contact-transition logic is currently concentrated in:
 
+- `quadruped_pympc/helpers/rear_transition_manager.py`
 - `quadruped_pympc/interfaces/wb_interface.py`
 - `simulation/run_linear_osqp.py`
 
