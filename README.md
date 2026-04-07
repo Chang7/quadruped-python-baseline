@@ -13,9 +13,12 @@ stack from scratch, but to:
 
 ## Current Focus
 
-The main remaining bottleneck is not the QP solve alone, but how the planned
-forces are carried through contact transition and load transfer, especially
-during rear touchdown/recontact.
+The main remaining bottlenecks are now:
+
+1. `crawl`: late rear load transfer / post-touchdown stabilization, after the
+   earlier rear recontact seam was narrowed down.
+2. `trot`: motion quality in dynamic scenarios, especially pitch bias and
+   forward-tracking quality relative to the stock sampling baseline.
 
 ## Current Status
 
@@ -26,6 +29,11 @@ during rear touchdown/recontact.
   checks without termination.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
+- The main recent `trot` geometry fix was made in the foothold-reference layer:
+  the custom `linear_osqp` path now freezes the world-frame foothold `z`
+  anchors during ongoing swing/stance updates, while the stock sampling path
+  keeps the original behavior. This removed a front/rear swing-height asymmetry
+  that had been coupling the swing references to body bobbing and pitch.
 - The current `linear_osqp` path now uses two explicit `trot` profiles instead
   of trying to force one dynamic preset to cover every case:
   - the default `auto` selection routes straight-line `trot` commands to the
@@ -37,6 +45,16 @@ during rear touchdown/recontact.
   - the optional `straight_tuned` profile is meant only for longer straight-line
     `trot` runs, where it improves forward tracking and posture quality over the
     earlier generic long-horizon behavior.
+- On top of the selective foothold-`z` fix, a narrow retune of the generic
+  `trot` profile gave only small trade-offs, so the current default keeps the
+  simpler generic profile unchanged for turn/disturbance checks.
+- The currently promoted `trot` validations are:
+  - `trot_straight_tuned_profile_20s/`: no termination, `mean_base_z ≈ 0.405`,
+    `mean |pitch| ≈ 0.149`
+  - `trot_generic_turn_profile_4s/`: no termination, `mean_base_z ≈ 0.381`,
+    `mean |pitch| ≈ 0.138`
+  - `trot_generic_disturb_profile_4s/`: no termination, `mean_base_z ≈ 0.383`,
+    `mean |pitch| ≈ 0.152`
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -169,8 +187,9 @@ Latest locally validated outputs:
 - `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
 - `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`
 
-The main contact-transition logic is currently concentrated in:
+The main active files for the current `trot` / contact-transition work are:
 
+- `quadruped_pympc/helpers/foothold_reference_generator.py`
 - `quadruped_pympc/helpers/rear_transition_manager.py`
 - `quadruped_pympc/interfaces/wb_interface.py`
 - `simulation/run_linear_osqp.py`

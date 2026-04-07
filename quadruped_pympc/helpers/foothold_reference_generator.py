@@ -13,7 +13,12 @@ from quadruped_pympc import config as cfg
 # TODO: @Giulio Should we convert this to a single function instead of a class? Stance time, can be passed as argument
 class FootholdReferenceGenerator:
     def __init__(
-        self, stance_time: float, lift_off_positions: LegsAttr, vel_moving_average_length=20, hip_height: float = None
+        self,
+        stance_time: float,
+        lift_off_positions: LegsAttr,
+        vel_moving_average_length=20,
+        hip_height: float = None,
+        freeze_world_z_during_contact_phases: bool = False,
     ) -> None:
         """This method initializes the foothold generator class, which computes
         the reference foothold for the nonlinear MPC.
@@ -38,6 +43,7 @@ class FootholdReferenceGenerator:
         self.lift_off_positions_h =  R_W2H @ (self.lift_off_positions - base_position[0:2])"""
         self.lift_off_positions_h = copy.deepcopy(lift_off_positions)  # TODO wrong
         self.touch_down_positions_h = copy.deepcopy(lift_off_positions)  # TODO wrong
+        self.freeze_world_z_during_contact_phases = bool(freeze_world_z_during_contact_phases)
 
         # The footholds are wrt the hip position, so if we want to change
         # the default foothold, we need to use a variable to add an offset
@@ -174,8 +180,14 @@ class FootholdReferenceGenerator:
                 self.lift_off_positions_h[leg_name] = R_W2H @ (self.lift_off_positions[leg_name] - base_position)
 
             elif previous_contact[leg_id] == 0 and current_contact[leg_id] == 0:
-                # Update lift-offs in world frame
-                self.lift_off_positions[leg_name] = R_W2H.T @ self.lift_off_positions_h[leg_name] + base_position
+                updated_lift_off = R_W2H.T @ self.lift_off_positions_h[leg_name] + base_position
+                if self.freeze_world_z_during_contact_phases:
+                    # Keep the world-frame lift-off height frozen during swing.
+                    # Reapplying the full base position would drag the swing
+                    # reference up/down with body bobbing and pitch, which can
+                    # create front/rear asymmetry in dynamic gaits.
+                    updated_lift_off[2] = float(self.lift_off_positions[leg_name][2])
+                self.lift_off_positions[leg_name] = updated_lift_off
 
     def update_touch_down_positions(
         self, previous_contact, current_contact, feet_pos, legs_order, gait_type, base_position, base_ori_euler_xyz
@@ -195,8 +207,12 @@ class FootholdReferenceGenerator:
                 self.touch_down_positions_h[leg_name] = R_W2H @ (self.touch_down_positions[leg_name] - base_position)
 
             elif previous_contact[leg_id] == 1 and current_contact[leg_id] == 1:
-                # Update touch-downs in world frame
-                self.touch_down_positions[leg_name] = R_W2H.T @ self.touch_down_positions_h[leg_name] + base_position
+                updated_touch_down = R_W2H.T @ self.touch_down_positions_h[leg_name] + base_position
+                if self.freeze_world_z_during_contact_phases:
+                    # Keep the touchdown world-z anchored once the foot is in
+                    # stance; only x/y should follow the horizontal-frame anchor.
+                    updated_touch_down[2] = float(self.touch_down_positions[leg_name][2])
+                self.touch_down_positions[leg_name] = updated_touch_down
 
 
 if __name__ == "__main__":

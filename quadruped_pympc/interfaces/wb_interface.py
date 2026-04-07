@@ -69,7 +69,10 @@ class WBInterface:
         # Create the foothold reference generator ------------------------------------------------
         stance_time = (1 / self.pgg.step_freq) * self.pgg.duty_factor
         self.frg = FootholdReferenceGenerator(
-            stance_time=stance_time, hip_height=cfg.hip_height, lift_off_positions=initial_feet_pos
+            stance_time=stance_time,
+            hip_height=cfg.hip_height,
+            lift_off_positions=initial_feet_pos,
+            freeze_world_z_during_contact_phases=(cfg.mpc_params['type'] == 'linear_osqp'),
         )
 
         # Create swing trajectory generator ------------------------------------------------------
@@ -3441,8 +3444,9 @@ class WBInterface:
                                 des_foot_pos[leg_name][2] = max_anchor_z
                     is_latched_swing = int(self.planned_contact[leg_id]) == 0
                     release_alpha = self.get_latched_release_alpha(leg_id) if is_latched_swing else 0.0
+                    linear_params = getattr(cfg, 'linear_osqp_params', {})
                     stance_blend = float(
-                        np.clip(getattr(cfg, 'linear_osqp_params', {}).get('stance_target_blend', 0.0), 0.0, 1.0)
+                        np.clip(linear_params.get('stance_target_blend', 0.0), 0.0, 1.0)
                     )
                     if stance_blend > 0.0:
                         des_foot_pos[leg_name][0:2] = (
