@@ -21,8 +21,14 @@ during rear touchdown/recontact.
 
 - The stock MuJoCo integration stack is stable in the reference scenarios used
   here.
+- In addition to straight `trot`, the stock sampling controller also completes
+  the current short-horizon `trot + turn` and scheduled `trot + disturbance`
+  checks without termination.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
+- The current `linear_osqp` path also remains viable over the same short
+  `trot + turn` and scheduled `trot + disturbance` checks, but still carries a
+  lower average body height and a larger pitch bias than the stock baseline.
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -59,8 +65,6 @@ during rear touchdown/recontact.
   - milestone runs from the earlier adapter-side debugging history
 - `outputs/report_progress_explainer/`
   - current figures, GIFs, and report/email assets
-- `outputs/stock_stack_runs/`
-  - raw stock-stack diagnostic history
 - `outputs/archive/`
   - superseded or raw historical outputs kept for traceability
 
@@ -100,10 +104,34 @@ Short stock `trot` reference:
 python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_stock_sampling_trot
 ```
 
+Short stock `trot + turn` reference:
+
+```bash
+python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_stock_sampling_trot_turn
+```
+
+Short stock `trot + disturbance` reference:
+
+```bash
+python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_stock_sampling_trot_disturb
+```
+
 Short custom `linear_osqp` `trot`:
 
 ```bash
 python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
+```
+
+Short custom `linear_osqp` `trot + turn`:
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_linear_osqp_trot_turn
+```
+
+Short custom `linear_osqp` `trot + disturbance`:
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_linear_osqp_trot_disturb
 ```
 
 Current default `crawl` diagnostic:
@@ -122,12 +150,20 @@ Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
 - `outputs/curated_runs/trot_after_rearallcontact_rearfloor_default_3s/`
+- `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
+- `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`
+- `outputs/curated_runs/linear_osqp_trot_turn_4s_y04_recheck/`
+- `outputs/curated_runs/linear_osqp_trot_disturb_4s_x48_recheck/`
 
 The main contact-transition logic is currently concentrated in:
 
 - `quadruped_pympc/helpers/rear_transition_manager.py`
 - `quadruped_pympc/interfaces/wb_interface.py`
 - `simulation/run_linear_osqp.py`
+
+The `--disturbance-pulse` flag injects a smooth scheduled wrench pulse of the
+form `axis:time:duration:magnitude`. This is intended as a lightweight local
+approximation for paper-style disturbance checks.
 
 ## Recommended Reading Order
 

@@ -6,6 +6,7 @@ import pathlib
 import time
 from os import PathLike
 from pprint import pprint
+from typing import Any
 
 import mujoco
 import numpy as np
@@ -116,6 +117,35 @@ def _apply_contact_overrides(model, simulation_params) -> None:
             model.geom_friction[geom_id, 2] = max(float(rolling_override), 0.0)
 
 
+def _compute_scheduled_disturbance_wrench(
+    disturbance_schedule: list[dict[str, Any]] | None,
+    sim_time: float,
+) -> np.ndarray:
+    """Return the current world-frame 6D wrench from user-scheduled disturbance pulses.
+
+    Each pulse is a dict with:
+    - time_s: pulse start time
+    - duration_s: pulse duration
+    - wrench: 6D world-frame wrench [Fx, Fy, Fz, Mx, My, Mz]
+
+    A squared-sine envelope keeps the pulse smooth and zero at the ends.
+    """
+    if not disturbance_schedule:
+        return np.zeros(6, dtype=float)
+
+    wrench = np.zeros(6, dtype=float)
+    now = float(sim_time)
+    for pulse in disturbance_schedule:
+        start = float(pulse.get("time_s", 0.0))
+        duration = max(float(pulse.get("duration_s", 0.0)), 1e-6)
+        phase = (now - start) / duration
+        if phase < 0.0 or phase > 1.0:
+            continue
+        alpha = float(np.sin(np.pi * phase) ** 2)
+        wrench += alpha * np.asarray(pulse.get("wrench", np.zeros(6)), dtype=float).reshape(6)
+    return wrench
+
+
 def run_simulation(
     qpympc_cfg,
     process=0,
@@ -135,6 +165,7 @@ def run_simulation(
     random_reset_on_terminate: bool = False,
     controller_ref_base_lin_vel: np.ndarray | None = None,
     controller_ref_base_ang_vel: np.ndarray | None = None,
+    disturbance_schedule: list[dict[str, Any]] | None = None,
 ):
     np.set_printoptions(precision=3, suppress=True)
     np.random.seed(seed)
@@ -378,6 +409,11 @@ def run_simulation(
             action[env.legs_tau_idx.FR] = tau.FR
             action[env.legs_tau_idx.RL] = tau.RL
             action[env.legs_tau_idx.RR] = tau.RR
+
+            env.mjData.qfrc_applied[:6] = _compute_scheduled_disturbance_wrench(
+                disturbance_schedule,
+                env.simulation_time,
+            )
 
             state, reward, is_terminated, is_truncated, info = env.step(action=action)
             ctrl_state = quadrupedpympc_wrapper.get_obs()

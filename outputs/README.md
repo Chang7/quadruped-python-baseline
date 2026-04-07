@@ -18,6 +18,11 @@ committed to GitHub.
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
     - `stock_sampling_crawl_4s_s012_isolated_recheck/`
     - `stock_sampling_trot_4s_s012_isolated_recheck/`
+    - `stock_sampling_trot_turn_4s_y04_recheck/`
+    - `stock_sampling_trot_disturb_4s_x48_recheck/`
+  - matching custom-controller short checks:
+    - `linear_osqp_trot_turn_4s_y04_recheck/`
+    - `linear_osqp_trot_disturb_4s_x48_recheck/`
   - key historical milestones:
     - `trot_dynamic_gait_fix/`
     - `trot_dynamic_gait_balanced/`

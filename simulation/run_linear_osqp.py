@@ -15,6 +15,48 @@ else:
     from .simulation import run_simulation
 
 
+_DISTURBANCE_AXIS_TO_INDEX = {
+    "x": 0,
+    "y": 1,
+    "z": 2,
+    "roll": 3,
+    "pitch": 4,
+    "yaw": 5,
+}
+
+
+def _parse_disturbance_pulses(specs: list[str] | None) -> list[dict[str, object]]:
+    """Parse repeated disturbance pulse specs of the form axis:time:duration:magnitude."""
+    schedule: list[dict[str, object]] = []
+    if not specs:
+        return schedule
+
+    for raw_spec in specs:
+        parts = [part.strip().lower() for part in raw_spec.split(":")]
+        if len(parts) != 4:
+            raise ValueError(
+                f"Invalid disturbance pulse '{raw_spec}'. Expected axis:time:duration:magnitude."
+            )
+        axis_name, time_s_text, duration_s_text, magnitude_text = parts
+        if axis_name not in _DISTURBANCE_AXIS_TO_INDEX:
+            valid = ", ".join(_DISTURBANCE_AXIS_TO_INDEX.keys())
+            raise ValueError(f"Invalid disturbance axis '{axis_name}'. Expected one of: {valid}.")
+
+        time_s = float(time_s_text)
+        duration_s = max(float(duration_s_text), 1e-6)
+        magnitude = float(magnitude_text)
+        wrench = [0.0] * 6
+        wrench[_DISTURBANCE_AXIS_TO_INDEX[axis_name]] = magnitude
+        schedule.append(
+            {
+                "time_s": time_s,
+                "duration_s": duration_s,
+                "wrench": wrench,
+            }
+        )
+    return schedule
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Quadruped-PyMPC with artifact logging and optional linear OSQP controller.")
     parser.add_argument("--seconds", type=int, default=20)
@@ -24,6 +66,15 @@ def main() -> None:
     parser.add_argument("--lateral-speed", type=float, default=0.0, help="Optional lateral command in normalized env units used only for the controller reference.")
     parser.add_argument("--preset", type=str, default="conservative", choices=("conservative", "baseline"), help="Use conservative low-level-friendly defaults for first stable runs.")
     parser.add_argument("--yaw-rate", type=float, default=0.0)
+    parser.add_argument(
+        "--disturbance-pulse",
+        action="append",
+        default=[],
+        help=(
+            "Repeatable smooth external-wrench pulse in the form axis:time:duration:magnitude, "
+            "for example --disturbance-pulse x:0.5:0.2:4.0"
+        ),
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--controller", type=str, default="linear_osqp", choices=("linear_osqp", "nominal", "input_rates", "sampling"))
     parser.add_argument("--render", action="store_true", help="Show the MuJoCo viewer (can segfault on exit on some setups).")
@@ -258,6 +309,7 @@ def main() -> None:
     parser.add_argument("--contact-torsional-friction", type=float, default=None, help="Optional torsional friction override for floor and foot geoms.")
     parser.add_argument("--contact-rolling-friction", type=float, default=None, help="Optional rolling friction override for floor and foot geoms.")
     args = parser.parse_args()
+    disturbance_schedule = _parse_disturbance_pulses(args.disturbance_pulse)
 
     cfg.mpc_params["type"] = args.controller
     cfg.mpc_params["horizon"] = args.horizon
@@ -1329,6 +1381,7 @@ def main() -> None:
         random_reset_on_terminate=args.random_reset_on_terminate,
         controller_ref_base_lin_vel=controller_ref_base_lin_vel,
         controller_ref_base_ang_vel=controller_ref_base_ang_vel,
+        disturbance_schedule=disturbance_schedule,
     )
     if output is not None:
         print(f"\nPrimary output path: {output}")
