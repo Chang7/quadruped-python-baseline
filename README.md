@@ -26,9 +26,14 @@ during rear touchdown/recontact.
   checks without termination.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
-- The current `linear_osqp` path also remains viable over the same short
-  `trot + turn` and scheduled `trot + disturbance` checks, but still carries a
-  lower average body height and a larger pitch bias than the stock baseline.
+- The current `linear_osqp` path now uses two explicit `trot` profiles instead
+  of trying to force one dynamic preset to cover every case:
+  - the default `generic` profile is meant for all-scenario checks and remains
+    viable over the short `trot + turn` and scheduled `trot + disturbance`
+    tests;
+  - the optional `straight_tuned` profile is meant only for longer straight-line
+    `trot` runs, where it improves forward tracking and posture quality over the
+    earlier generic long-horizon behavior.
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -116,22 +121,28 @@ Short stock `trot + disturbance` reference:
 python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_stock_sampling_trot_disturb
 ```
 
-Short custom `linear_osqp` `trot`:
+Short custom `linear_osqp` `trot` (`generic` profile):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
 ```
 
-Short custom `linear_osqp` `trot + turn`:
+Long straight custom `linear_osqp` `trot` (`straight_tuned` profile):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_linear_osqp_trot_turn
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile straight_tuned --seconds 20 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot_straight_tuned
 ```
 
-Short custom `linear_osqp` `trot + disturbance`:
+Short custom `linear_osqp` `trot + turn` (`generic` profile):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_linear_osqp_trot_disturb
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_linear_osqp_trot_turn
+```
+
+Short custom `linear_osqp` `trot + disturbance` (`generic` profile):
+
+```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_linear_osqp_trot_disturb
 ```
 
 Current default `crawl` diagnostic:
@@ -149,11 +160,11 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
-- `outputs/curated_runs/trot_after_rearallcontact_rearfloor_default_3s/`
+- `outputs/curated_runs/trot_generic_turn_profile_4s/`
+- `outputs/curated_runs/trot_generic_disturb_profile_4s/`
+- `outputs/curated_runs/trot_straight_tuned_profile_20s/`
 - `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
 - `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`
-- `outputs/curated_runs/linear_osqp_trot_turn_4s_y04_recheck/`
-- `outputs/curated_runs/linear_osqp_trot_disturb_4s_x48_recheck/`
 
 The main contact-transition logic is currently concentrated in:
 

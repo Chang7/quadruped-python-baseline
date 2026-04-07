@@ -57,6 +57,73 @@ def _parse_disturbance_pulses(specs: list[str] | None) -> list[dict[str, object]
     return schedule
 
 
+def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
+    """Dynamic-gait profile that remains usable across straight, turn, and disturbance checks."""
+    return {
+        "command_smoothing": 0.0,
+        "vx_gain": 2.3,
+        "fy_scale": 0.20,
+        "dynamic_fy_roll_gain": 0.0,
+        "dynamic_fy_roll_ref": 0.18,
+        "grf_max_scale": 1.0,
+        "stance_ramp_steps": 1,
+        "joint_pd_scale": 0.10,
+        "stance_joint_pd_scale": 0.05,
+        "latched_joint_pd_scale": 0.10,
+        "rear_floor_base_scale": 0.65,
+        "rear_floor_pitch_gain": 0.20,
+        "support_reference_mix": 0.70,
+        "min_vertical_force_scale": 1.0,
+        "reduced_support_vertical_boost": 0.40,
+        "du_xy_max": 10.0,
+        "du_z_max": 25.0,
+        "side_rebalance_gain": 0.0,
+        "side_rebalance_ref": 0.20,
+        "pitch_rebalance_gain": 0.0,
+        "pitch_angle_gain": 40.0,
+        "pitch_rate_gain": 12.0,
+        "pitch_rebalance_ref": 0.20,
+        "pre_swing_gate_min_margin": 0.0,
+        "front_pre_swing_gate_min_margin": 0.0,
+        "rear_pre_swing_gate_min_margin": 0.0,
+        "pre_swing_gate_hold_s": 0.0,
+        "contact_latch_steps": 0,
+        "contact_latch_budget_s": 0.0,
+        "virtual_unlatch_hold_s": 0.0,
+    }
+
+
+def _trot_straight_tuned_profile() -> dict[str, float | int]:
+    """Straight-line trot profile tuned for longer-horizon forward tracking."""
+    profile = _dynamic_gait_conservative_profile()
+    profile.update(
+        {
+            "vx_gain": 5.5,
+            "fy_scale": 0.35,
+            "dynamic_fy_roll_gain": 0.25,
+            "stance_joint_pd_scale": 0.10,
+            "joint_pd_scale": 0.10,
+            "latched_joint_pd_scale": 0.10,
+            "rear_floor_base_scale": 0.50,
+            "rear_floor_pitch_gain": 0.0,
+            "support_reference_mix": 0.75,
+            "reduced_support_vertical_boost": 0.30,
+            "pitch_angle_gain": 37.0,
+            "pitch_rate_gain": 11.0,
+            "support_centroid_x_gain": 1.0,
+        }
+    )
+    return profile
+
+
+def _dynamic_gait_profile_for(gait: str, trot_profile: str) -> dict[str, float | int]:
+    if gait not in {"trot", "pace", "bound"}:
+        return {}
+    if gait == "trot" and trot_profile == "straight_tuned":
+        return _trot_straight_tuned_profile()
+    return _dynamic_gait_conservative_profile()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Quadruped-PyMPC with artifact logging and optional linear OSQP controller.")
     parser.add_argument("--seconds", type=int, default=20)
@@ -65,7 +132,15 @@ def main() -> None:
     parser.add_argument("--speed", type=float, default=0.12, help="Forward command in normalized env units used by simulation.py")
     parser.add_argument("--lateral-speed", type=float, default=0.0, help="Optional lateral command in normalized env units used only for the controller reference.")
     parser.add_argument("--preset", type=str, default="conservative", choices=("conservative", "baseline"), help="Use conservative low-level-friendly defaults for first stable runs.")
+    parser.add_argument(
+        "--dynamic-trot-profile",
+        type=str,
+        default="generic",
+        choices=("generic", "straight_tuned"),
+        help="For trot only: keep the generic all-scenario dynamic profile or use the straight-line-tuned profile for longer forward runs.",
+    )
     parser.add_argument("--yaw-rate", type=float, default=0.0)
+    parser.add_argument("--step-height", type=float, default=None, help="Override swing step height in meters.")
     parser.add_argument(
         "--disturbance-pulse",
         action="append",
@@ -97,6 +172,8 @@ def main() -> None:
     parser.add_argument("--du-z-max", type=float, default=None, help="Override per-step fz slew limit [N].")
     parser.add_argument("--stance-ramp-steps", type=int, default=None, help="Override stance ramp length in controller steps.")
     parser.add_argument("--fy-scale", type=float, default=None, help="Override lateral-force scaling applied after solve.")
+    parser.add_argument("--dynamic-fy-roll-gain", type=float, default=None, help="Extra lateral-force authority that ramps in with absolute roll during dynamic gaits.")
+    parser.add_argument("--dynamic-fy-roll-ref", type=float, default=None, help="Roll angle [rad] that saturates the temporary dynamic lateral-force boost.")
     parser.add_argument("--grf-max-scale", type=float, default=None, help="Override effective normal-force upper bound as fraction of body weight budget.")
     parser.add_argument("--support-floor-ratio", type=float, default=None, help="Override minimum per-stance-leg normal force as fraction of body weight / n_stance.")
     parser.add_argument("--joint-pd-scale", type=float, default=None, help="Override additional low-level joint PD blend for linear_osqp.")
@@ -124,6 +201,7 @@ def main() -> None:
     parser.add_argument("--support-centroid-y-gain", type=float, default=None, help="Move the body toward the left/right center of the current support polygon during swing.")
     parser.add_argument("--pre-swing-front-shift-scale", type=float, default=None, help="Scale pre-swing support-centroid shift when the upcoming swing leg is a front leg.")
     parser.add_argument("--pre-swing-rear-shift-scale", type=float, default=None, help="Scale pre-swing support-centroid shift when the upcoming swing leg is a rear leg.")
+    parser.add_argument("--support-reference-mix", type=float, default=None, help="Blend factor between the equal-support guess and the solved support wrench reference.")
     parser.add_argument("--vx-gain", type=float, default=None, help="Forward velocity-error gain used in the desired body force heuristic.")
     parser.add_argument("--vy-gain", type=float, default=None, help="Lateral velocity-error gain used in the desired body force heuristic.")
     parser.add_argument("--pre-swing-gate-min-margin", type=float, default=None, help="Delay lift-off until the upcoming support polygon margin exceeds this value in meters.")
@@ -640,40 +718,7 @@ def main() -> None:
                     }
                 )
             if args.gait in {"trot", "pace", "bound"}:
-                conservative_params.update(
-                    {
-                        # Dynamic gaits need faster force build-up and much less
-                        # static support guarding than the crawl-oriented preset.
-                        "command_smoothing": 0.0,
-                        "fy_scale": 0.45,
-                        "dynamic_fy_roll_gain": 0.25,
-                        "dynamic_fy_roll_ref": 0.18,
-                        "grf_max_scale": 1.0,
-                        "stance_ramp_steps": 1,
-                        "joint_pd_scale": 0.15,
-                        "stance_joint_pd_scale": 0.15,
-                        "latched_joint_pd_scale": 0.15,
-                        "rear_floor_base_scale": 0.50,
-                        "rear_floor_pitch_gain": 0.0,
-                        "min_vertical_force_scale": 1.0,
-                        "reduced_support_vertical_boost": 0.30,
-                        "du_xy_max": 10.0,
-                        "du_z_max": 25.0,
-                        "side_rebalance_gain": 0.0,
-                        "side_rebalance_ref": 0.20,
-                        "pitch_rebalance_gain": 0.0,
-                        "pitch_angle_gain": 37.0,
-                        "pitch_rate_gain": 11.0,
-                        "pitch_rebalance_ref": 0.20,
-                        "pre_swing_gate_min_margin": 0.0,
-                        "front_pre_swing_gate_min_margin": 0.0,
-                        "rear_pre_swing_gate_min_margin": 0.0,
-                        "pre_swing_gate_hold_s": 0.0,
-                        "contact_latch_steps": 0,
-                        "contact_latch_budget_s": 0.0,
-                        "virtual_unlatch_hold_s": 0.0,
-                    }
-                )
+                conservative_params.update(_dynamic_gait_profile_for(args.gait, args.dynamic_trot_profile))
             cfg.linear_osqp_params.update(conservative_params)
         if args.q_p is not None:
             cfg.linear_osqp_params["Q_p"] = args.q_p
@@ -695,6 +740,10 @@ def main() -> None:
             cfg.linear_osqp_params["stance_ramp_steps"] = args.stance_ramp_steps
         if args.fy_scale is not None:
             cfg.linear_osqp_params["fy_scale"] = args.fy_scale
+        if args.dynamic_fy_roll_gain is not None:
+            cfg.linear_osqp_params["dynamic_fy_roll_gain"] = max(float(args.dynamic_fy_roll_gain), 0.0)
+        if args.dynamic_fy_roll_ref is not None:
+            cfg.linear_osqp_params["dynamic_fy_roll_ref"] = max(float(args.dynamic_fy_roll_ref), 1e-6)
         if args.grf_max_scale is not None:
             cfg.linear_osqp_params["grf_max_scale"] = args.grf_max_scale
         if args.support_floor_ratio is not None:
@@ -749,6 +798,8 @@ def main() -> None:
             cfg.linear_osqp_params["pre_swing_front_shift_scale"] = args.pre_swing_front_shift_scale
         if args.pre_swing_rear_shift_scale is not None:
             cfg.linear_osqp_params["pre_swing_rear_shift_scale"] = args.pre_swing_rear_shift_scale
+        if args.support_reference_mix is not None:
+            cfg.linear_osqp_params["support_reference_mix"] = max(min(float(args.support_reference_mix), 1.0), 0.0)
         if args.pre_swing_gate_min_margin is not None:
             cfg.linear_osqp_params["pre_swing_gate_min_margin"] = max(float(args.pre_swing_gate_min_margin), 0.0)
         if args.front_pre_swing_gate_min_margin is not None:
@@ -1329,6 +1380,12 @@ def main() -> None:
             cfg.linear_osqp_params["pre_swing_lookahead_steps"] = max(int(args.pre_swing_lookahead_steps), 0)
 
     cfg.simulation_params["gait"] = args.gait
+    if args.step_height is not None:
+        cfg.simulation_params["step_height"] = max(float(args.step_height), 0.0)
+    elif args.preset == "conservative" and args.gait in {"trot", "pace", "bound"}:
+        # A lower default step height keeps the dynamic-gait swing motion more
+        # compact and consistently improved short-horizon trot quality.
+        cfg.simulation_params["step_height"] = 0.04
     if args.preset == "conservative" and args.gait == "crawl":
         if args.gait_step_freq is None:
             cfg.simulation_params["gait_params"][args.gait]["step_freq"] = 0.40

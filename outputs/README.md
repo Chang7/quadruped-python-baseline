@@ -12,7 +12,9 @@ committed to GitHub.
   - only the key milestone runs and current validated defaults are kept here
   - current defaults:
     - `crawl_rearallcontact_rearfloor_default_10s/`
-    - `trot_after_rearallcontact_rearfloor_default_3s/`
+    - `trot_generic_turn_profile_4s/`
+    - `trot_generic_disturb_profile_4s/`
+    - `trot_straight_tuned_profile_20s/`
   - stock-controller sanity checks:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
@@ -21,8 +23,10 @@ committed to GitHub.
     - `stock_sampling_trot_turn_4s_y04_recheck/`
     - `stock_sampling_trot_disturb_4s_x48_recheck/`
   - matching custom-controller short checks:
-    - `linear_osqp_trot_turn_4s_y04_recheck/`
-    - `linear_osqp_trot_disturb_4s_x48_recheck/`
+    - `trot_generic_turn_profile_4s/`
+    - `trot_generic_disturb_profile_4s/`
+  - straight-line tuned `trot` profile checks:
+    - `trot_straight_tuned_profile_20s/`
   - key historical milestones:
     - `trot_dynamic_gait_fix/`
     - `trot_dynamic_gait_balanced/`

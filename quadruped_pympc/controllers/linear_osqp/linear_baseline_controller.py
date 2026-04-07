@@ -77,6 +77,7 @@ class LinearOSQPConfig:
     pre_swing_lookahead_steps: int = 3
     pre_swing_front_shift_scale: float = 1.0
     pre_swing_rear_shift_scale: float = 1.0
+    support_reference_mix: float = 0.55
     vx_gain: float = 1.6
     vy_gain: float = 4.5
     z_pos_gain: float = 20.0
@@ -142,6 +143,7 @@ def _get_linear_params() -> dict:
         "pre_swing_lookahead_steps": 3,
         "pre_swing_front_shift_scale": 1.0,
         "pre_swing_rear_shift_scale": 1.0,
+        "support_reference_mix": 0.55,
         "vx_gain": 1.6,
         "vy_gain": 4.5,
         "z_pos_gain": 20.0,
@@ -232,6 +234,7 @@ class LinearSRBDController:
             pre_swing_lookahead_steps=max(0, int(params.get("pre_swing_lookahead_steps", 3))),
             pre_swing_front_shift_scale=float(params.get("pre_swing_front_shift_scale", 1.0)),
             pre_swing_rear_shift_scale=float(params.get("pre_swing_rear_shift_scale", 1.0)),
+            support_reference_mix=float(np.clip(params.get("support_reference_mix", 0.55), 0.0, 1.0)),
             vx_gain=float(params.get("vx_gain", 1.6)),
             vy_gain=float(params.get("vy_gain", 4.5)),
             z_pos_gain=float(params.get("z_pos_gain", 20.0)),
@@ -971,7 +974,7 @@ class LinearSRBDController:
             u_active[idx, 1] = np.clip(u_active[idx, 1], -fy_max, fy_max)
             u_active[idx, 2] = fz
 
-        mix = 0.55
+        mix = float(np.clip(cfg.support_reference_mix, 0.0, 1.0))
         u = u_guess.copy()
         u[active_legs] = (1.0 - mix) * u_guess[active_legs] + mix * u_active
         return u.reshape(NU)
