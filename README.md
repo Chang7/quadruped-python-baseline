@@ -28,7 +28,10 @@ during rear touchdown/recontact.
   in short-horizon `trot` tests.
 - The current `linear_osqp` path now uses two explicit `trot` profiles instead
   of trying to force one dynamic preset to cover every case:
-  - the default `generic` profile is meant for all-scenario checks and remains
+  - the default `auto` selection routes straight-line `trot` commands to the
+    `straight_tuned` profile, and routes turning / disturbance checks to the
+    `generic` profile;
+  - the `generic` profile is meant for all-scenario checks and remains
     viable over the short `trot + turn` and scheduled `trot + disturbance`
     tests;
   - the optional `straight_tuned` profile is meant only for longer straight-line
@@ -121,10 +124,10 @@ Short stock `trot + disturbance` reference:
 python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_stock_sampling_trot_disturb
 ```
 
-Short custom `linear_osqp` `trot` (`generic` profile):
+Short custom `linear_osqp` `trot` (default `auto` profile selection):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 3 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot
 ```
 
 Long straight custom `linear_osqp` `trot` (`straight_tuned` profile):
@@ -133,16 +136,16 @@ Long straight custom `linear_osqp` `trot` (`straight_tuned` profile):
 python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile straight_tuned --seconds 20 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_trot_straight_tuned
 ```
 
-Short custom `linear_osqp` `trot + turn` (`generic` profile):
+Short custom `linear_osqp` `trot + turn` (default `auto` profile selection):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_linear_osqp_trot_turn
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.4 --artifact-dir outputs/repro_linear_osqp_trot_turn
 ```
 
-Short custom `linear_osqp` `trot + disturbance` (`generic` profile):
+Short custom `linear_osqp` `trot + disturbance` (default `auto` profile selection):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --dynamic-trot-profile generic --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_linear_osqp_trot_disturb
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_linear_osqp_trot_disturb
 ```
 
 Current default `crawl` diagnostic:

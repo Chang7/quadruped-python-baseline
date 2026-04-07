@@ -15,6 +15,8 @@ committed to GitHub.
     - `trot_generic_turn_profile_4s/`
     - `trot_generic_disturb_profile_4s/`
     - `trot_straight_tuned_profile_20s/`
+    - default trot behavior now selects between the `generic` and
+      `straight_tuned` profiles automatically based on the command
   - stock-controller sanity checks:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`

@@ -135,9 +135,9 @@ def main() -> None:
     parser.add_argument(
         "--dynamic-trot-profile",
         type=str,
-        default="generic",
-        choices=("generic", "straight_tuned"),
-        help="For trot only: keep the generic all-scenario dynamic profile or use the straight-line-tuned profile for longer forward runs.",
+        default="auto",
+        choices=("auto", "generic", "straight_tuned"),
+        help="For trot only: use the generic all-scenario profile, the straight-line-tuned profile, or let auto pick between them from the command.",
     )
     parser.add_argument("--yaw-rate", type=float, default=0.0)
     parser.add_argument("--step-height", type=float, default=None, help="Override swing step height in meters.")
@@ -388,6 +388,16 @@ def main() -> None:
     parser.add_argument("--contact-rolling-friction", type=float, default=None, help="Optional rolling friction override for floor and foot geoms.")
     args = parser.parse_args()
     disturbance_schedule = _parse_disturbance_pulses(args.disturbance_pulse)
+    selected_dynamic_trot_profile = args.dynamic_trot_profile
+    if args.gait == "trot" and args.dynamic_trot_profile == "auto":
+        if (
+            abs(float(args.yaw_rate)) < 1e-9
+            and abs(float(args.lateral_speed)) < 1e-9
+            and not disturbance_schedule
+        ):
+            selected_dynamic_trot_profile = "straight_tuned"
+        else:
+            selected_dynamic_trot_profile = "generic"
 
     cfg.mpc_params["type"] = args.controller
     cfg.mpc_params["horizon"] = args.horizon
@@ -718,7 +728,7 @@ def main() -> None:
                     }
                 )
             if args.gait in {"trot", "pace", "bound"}:
-                conservative_params.update(_dynamic_gait_profile_for(args.gait, args.dynamic_trot_profile))
+                conservative_params.update(_dynamic_gait_profile_for(args.gait, selected_dynamic_trot_profile))
             cfg.linear_osqp_params.update(conservative_params)
         if args.q_p is not None:
             cfg.linear_osqp_params["Q_p"] = args.q_p
@@ -1440,6 +1450,8 @@ def main() -> None:
         controller_ref_base_ang_vel=controller_ref_base_ang_vel,
         disturbance_schedule=disturbance_schedule,
     )
+    if args.gait == "trot":
+        print(f"Selected trot dynamic profile: {selected_dynamic_trot_profile}")
     if output is not None:
         print(f"\nPrimary output path: {output}")
 
