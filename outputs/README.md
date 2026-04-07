@@ -9,56 +9,46 @@ committed to GitHub.
 ## Current Structure
 
 - `curated_runs/`
-  - milestone runs and current validated defaults
-  - keep the latest "known-good" crawl/trot runs here so future changes always
-    have a clear comparison point
-  - current late-rear-all-contact defaults:
+  - only the key milestone runs and current validated defaults are kept here
+  - current defaults:
     - `crawl_rearallcontact_rearfloor_default_10s/`
     - `trot_after_rearallcontact_rearfloor_default_3s/`
-  - earlier rear-transition-manager milestone:
+  - stock-controller sanity checks:
+    - `stock_sampling_crawl_4s_s003_isolated_recheck/`
+    - `stock_sampling_crawl_4s_s006_isolated_recheck/`
+    - `stock_sampling_crawl_4s_s012_isolated_recheck/`
+    - `stock_sampling_trot_4s_s012_isolated_recheck/`
+  - key historical milestones:
+    - `trot_dynamic_gait_fix/`
+    - `trot_dynamic_gait_balanced/`
     - `crawl_rear_transition_manager_default_10s/`
-    - `trot_rear_transition_manager_default_3s/`
+    - `crawl_rearallcontact_zcap_default_10s/`
+    - `trot_long_after_patch/`
 - `report_progress_explainer/`
-  - current email/meeting/report assets
-- `stock_stack_runs/`
-  - raw stock-stack diagnostic history
+  - only the current concise shareable summaries are kept here
+  - `current_status_20260404/`
+  - `trot_stable_compare/`
 - `archive/`
-  - older raw runs and superseded output folders kept for traceability
-  - also the right place for exploratory `tmp_*` run folders once they are no
-    longer active
-  - `archive/raw_runs/front_recontact_trials/` currently holds the recent
-    follow-up probes that tried to push the new crawl default beyond the
-    4-second diagnostic horizon
-  - `archive/raw_runs/crawl_front_support_trials/` groups the newer 10-second
-    crawl experiments around front touchdown-support PD and related rear
-    support-window variants
-  - `archive/raw_runs/20260404_rear_touchdown_search/` keeps the later
-    rear-relatch-focused crawl search, including the rejected rear-leg PD /
-    touchdown-damping follow-up probes
-  - `archive/raw_runs/20260405_rear_transition_manager_search/` keeps the
-    first focused sweep after splitting the rear touchdown / recontact logic
-    into a dedicated helper, including stricter vs. looser rear contact
-    acceptance and short rear-settle/support variants
+  - only the recent raw search batches that still explain the current code path
+    are kept
+  - `archive/raw_runs/20260405_rear_transition_manager_search/`
   - `archive/raw_runs/tmp_continue/20260405_late_rear_allcontact_followup/`
-    keeps the later late-rear-all-contact follow-up that identified the current
-    best default sweet spot: lower front touchdown-support alpha together with a
-    temporary rear-load floor bias during the rear late all-contact window
 
 ## Suggested Reading Order
 
 1. `curated_runs/`
 2. `report_progress_explainer/`
-3. `stock_stack_runs/`
-4. `archive/`
+3. `archive/`
 
 ## Working Rules
 
 - Save new outputs here, not inside `1.Quadruped-PyMPC-main/`.
 - Use clearly named folders for meaningful runs.
 - If a result is only a temporary probe or a superseded comparison, move it to
-  `outputs/archive/` instead of leaving it at top level.
+  `outputs/archive/` briefly, then prune it if it no longer explains the
+  current direction.
 - After a tuning pass, keep:
   - one clean baseline,
   - one first meaningful breakthrough,
   - one current default validation run,
-  and archive the rest.
+  and only the smallest raw search batch that still explains the chosen fix.

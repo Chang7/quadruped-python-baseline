@@ -808,11 +808,29 @@ class WBInterface:
             self.front_rear_transition_guard_forward_scale = 1.0
             self.rear_swing_release_support_hold_s = 0.0
             self.rear_swing_release_forward_scale = 1.0
+        if cfg.mpc_params['type'] != 'linear_osqp':
+            # Keep stock controllers on the stock path: the crawl-specific
+            # rear transition / recovery heuristics in this branch are meant
+            # only for the custom linear_osqp controller.
+            self.front_margin_rescue_hold_s = 0.0
+            self.front_stance_dropout_support_hold_s = 0.0
+            self.rear_handoff_support_hold_s = 0.0
+            self.rear_swing_bridge_hold_s = 0.0
+            self.rear_swing_release_support_hold_s = 0.0
+            self.full_contact_recovery_hold_s = 0.0
+            self.full_contact_recovery_recent_window_s = 0.0
+            self.rear_touchdown_reacquire_hold_s = 0.0
+            self.rear_touchdown_confirm_hold_s = 0.0
+            self.rear_touchdown_settle_hold_s = 0.0
+            self.rear_post_touchdown_support_hold_s = 0.0
+            self.rear_all_contact_stabilization_hold_s = 0.0
+            self.front_rear_transition_guard_hold_s = 0.0
         self._configure_rear_transition_manager()
         self._sync_rear_transition_debug_arrays()
 
     def _configure_rear_transition_manager(self) -> None:
         self.rear_transition_manager.configure(
+            enabled=(cfg.mpc_params['type'] == 'linear_osqp'),
             contact_debounce_s=self.rear_touchdown_contact_debounce_s,
             contact_min_phase=self.rear_touchdown_contact_min_phase,
             contact_max_upward_vel=self.rear_touchdown_contact_max_upward_vel,
@@ -1652,8 +1670,10 @@ class WBInterface:
         self.front_stance_dropout_support_remaining_s[:] = 0.0
         self.last_gate_forward_scale = 1.0
         if getattr(contact_sequence, "ndim", 0) == 2 and contact_sequence.shape[0] == 4:
+            gate_forward_scale = 1.0
+            requested_gate_forward_scale = 1.0
+            requested_front_release_forward_scale = 1.0
             if cfg.mpc_params['type'] == 'linear_osqp':
-                gate_forward_scale = 1.0
                 requested_gate_forward_scale = float(
                     np.clip(getattr(cfg, 'linear_osqp_params', {}).get('pre_swing_gate_forward_scale', 1.0), 0.0, 1.0)
                 )

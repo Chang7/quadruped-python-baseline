@@ -13,6 +13,7 @@ class RearTransitionManager:
 
     def __init__(self, mpc_dt: float) -> None:
         self.mpc_dt = max(float(mpc_dt), 1e-6)
+        self.enabled = False
         self.contact_debounce_s = 0.0
         self.contact_min_phase = 0.0
         self.contact_max_upward_vel = np.inf
@@ -52,6 +53,7 @@ class RearTransitionManager:
     def configure(
         self,
         *,
+        enabled: bool,
         contact_debounce_s: float,
         contact_min_phase: float,
         contact_max_upward_vel: float,
@@ -87,6 +89,7 @@ class RearTransitionManager:
         pre_swing_guard_height_ratio: float,
         confirm_keep_swing: bool,
     ) -> None:
+        self.enabled = bool(enabled)
         self.contact_debounce_s = max(float(contact_debounce_s), 0.0)
         self.contact_min_phase = float(np.clip(contact_min_phase, 0.0, 1.0))
         self.contact_max_upward_vel = (
@@ -226,6 +229,8 @@ class RearTransitionManager:
         current_foot_vz: float | None = None,
         foot_grf_world: np.ndarray | None = None,
     ) -> bool:
+        if not self.enabled:
+            return False
         local_leg = self._local_leg_index(global_leg_id)
         rear_contact_signal = np.asarray(rear_contact_signal, dtype=int).reshape(-1)
         if local_leg >= rear_contact_signal.size:
@@ -279,6 +284,8 @@ class RearTransitionManager:
         simulation_dt: float,
         horizon_steps: int,
     ) -> tuple[int, float, int, float]:
+        if not self.enabled:
+            return 0, 0.0, 0, 1.0
         if (
             (not planned_stance)
             or (not waiting_for_recontact)
@@ -304,6 +311,8 @@ class RearTransitionManager:
         confirm_elapsed_s: float,
         stance_recontact: bool,
     ) -> bool:
+        if not self.enabled:
+            return False
         local_leg = self._local_leg_index(global_leg_id)
         keep_confirm = bool(stance_recontact or prev_reacquire_active or float(confirm_elapsed_s) > 1e-9)
         if not keep_confirm:
@@ -316,6 +325,8 @@ class RearTransitionManager:
         return keep_confirm
 
     def consume_confirm(self, global_leg_id: int, confirm_elapsed_s: float, simulation_dt: float) -> tuple[int, float, float]:
+        if not self.enabled:
+            return 0, 0.0, 1.0
         local_leg = self._local_leg_index(global_leg_id)
         self.pending_confirm[local_leg] = 0
         if self.confirm_hold_s <= 1e-9:
@@ -334,6 +345,8 @@ class RearTransitionManager:
         settle_remaining_s: float,
         simulation_dt: float,
     ) -> tuple[int, float, float]:
+        if not self.enabled:
+            return 0, 0.0, 1.0
         if (not planned_stance) or (not contact_ready):
             return 0, 0.0, 1.0
 
@@ -352,6 +365,8 @@ class RearTransitionManager:
         confirm_active: bool,
         contact_ready: bool,
     ) -> bool:
+        if not self.enabled:
+            return False
         return bool(self.confirm_keep_swing and confirm_active and contact_ready)
 
     def update_post_support_window(
@@ -369,6 +384,8 @@ class RearTransitionManager:
         rear_load_share: float,
         recovery_active: bool,
     ) -> tuple[int, float]:
+        if not self.enabled:
+            return 0, 1.0
         local_leg = self._local_leg_index(global_leg_id)
         if trigger and self.post_support_hold_s > 1e-9:
             self.post_support_remaining_s[local_leg] = max(
@@ -415,6 +432,8 @@ class RearTransitionManager:
         pitch_mag: float,
         rear_load_share: float,
     ) -> tuple[int, float, float]:
+        if not self.enabled:
+            return 0, 1.0, 1.0
         local_leg = self._local_leg_index(global_leg_id)
         if trigger and self.all_contact_stabilization_hold_s > 1e-9:
             self.all_contact_stabilization_remaining_s[local_leg] = max(
@@ -462,6 +481,8 @@ class RearTransitionManager:
         previous_actual_contact: bool,
         contact_ready: bool,
     ) -> bool:
+        if not self.enabled:
+            return False
         if gait_name != 'crawl' or (not contact_ready):
             return False
         contact_returned_now = bool(actual_contact) and (not bool(previous_actual_contact))
@@ -479,6 +500,8 @@ class RearTransitionManager:
         waiting_for_recontact: bool,
         contact_ready: bool,
     ) -> bool:
+        if not self.enabled:
+            return False
         return bool(
             gait_name == 'crawl'
             and (not planned_stance)
@@ -501,6 +524,8 @@ class RearTransitionManager:
         current_foot_vz: float | None = None,
         foot_grf_world: np.ndarray | None = None,
     ) -> bool:
+        if not self.enabled:
+            return False
         local_leg = self._local_leg_index(global_leg_id)
         rear_contact_signal = np.asarray(rear_contact_signal, dtype=int).reshape(-1)
         if local_leg >= rear_contact_signal.size:
@@ -552,6 +577,8 @@ class RearTransitionManager:
         waiting_for_recontact: bool,
         contact_ready: bool,
     ) -> bool:
+        if not self.enabled:
+            return False
         return bool(planned_stance and waiting_for_recontact and (not contact_ready))
 
     def should_delay_preswing_for_posture(
@@ -566,6 +593,8 @@ class RearTransitionManager:
         pitch_mag: float,
         height_ratio: float,
     ) -> bool:
+        if not self.enabled:
+            return False
         if gait_name != 'crawl':
             return False
         if not (scheduled_swing and current_contact and actual_contact and recovery_active):
@@ -590,6 +619,8 @@ class RearTransitionManager:
         pitch_mag: float,
         height_ratio: float,
     ) -> bool:
+        if not self.enabled:
+            return False
         if gait_name != 'crawl':
             return False
         if self.front_transition_guard_hold_s <= 1e-9:
