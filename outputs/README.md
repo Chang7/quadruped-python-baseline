@@ -9,52 +9,45 @@ committed to GitHub.
 ## Current Structure
 
 - `curated_runs/`
-  - only the key milestone runs and current validated defaults are kept here
+  - the place to start
+  - keep only:
+    - current defaults that we would rerun today
+    - stock sanity references that explain the scenario choice
+    - a few milestone runs that explain how the current code path was reached
   - current defaults:
     - `crawl_rearallcontact_rearfloor_default_10s/`
     - `trot_default_turn_profile_10s/`
     - `trot_default_disturb_profile_10s/`
     - `trot_default_straight_profile_20s/`
-  - default trot behavior now selects between the `generic` and
-    `straight_tuned` profiles automatically based on the command
-  - the current promoted `trot` runs use the selective linear-only
-    foothold-`z` anchoring fix in the foothold reference generator
-  - the current promoted `generic` trot runs also use
-    `support_reference_mix = 0.85` together with
-    `support_reference_xy_mix = 1.0`, which improved short-horizon turn and
-    disturbance posture quality relative to the earlier generic defaults while
-    preserving the separate straight-line `straight_tuned` profile
-  - the current promoted dynamic profiles also apply a small constant
-    posture-reference bias (`roll_ref_offset = +0.03 rad`,
-    `pitch_ref_offset = -0.01 rad`), which cleaned up the remaining steady
-    trot posture bias across turn, disturbance, and long straight-line runs
-  - stock-controller sanity checks:
+  - stock sanity references:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
     - `stock_sampling_crawl_4s_s012_isolated_recheck/`
     - `stock_sampling_trot_4s_s012_isolated_recheck/`
     - `stock_sampling_trot_turn_4s_y04_recheck/`
     - `stock_sampling_trot_disturb_4s_x48_recheck/`
-  - matching custom-controller default checks:
-    - `trot_default_turn_profile_10s/`
-    - `trot_default_disturb_profile_10s/`
-  - straight-line tuned `trot` profile checks:
-    - `trot_default_straight_profile_20s/`
-  - key historical milestones:
+  - milestone runs kept to avoid repeating the same failed directions:
     - `trot_dynamic_gait_fix/`
     - `trot_dynamic_gait_balanced/`
+    - `trot_long_after_patch/`
     - `crawl_rear_transition_manager_default_10s/`
     - `crawl_rearallcontact_zcap_default_10s/`
-    - `trot_long_after_patch/`
+  - current promoted `trot` path, in plain words:
+    - selective linear-only foothold-`z` anchoring fix
+    - split support-reference blending:
+      `support_reference_mix = 0.85`, `support_reference_xy_mix = 1.0`
+    - small constant posture-reference bias:
+      `roll_ref_offset = +0.03 rad`, `pitch_ref_offset = -0.01 rad`
 - `report_progress_explainer/`
-  - only the current concise shareable summaries are kept here
-  - `current_status_20260404/`
-  - `trot_stable_compare/`
+  - small shareable bundles only
+  - `stock_vs_linear_analysis_20260408/` is the current stock-vs-custom
+    comparison bundle for matched 4 s checks
+  - `trot_stable_compare/` is the active email/report comparison bundle
+  - `archive/current_status_20260404/` is kept only as an older snapshot
 - `archive/`
-  - only the recent raw search batches that still explain the current code path
-    are kept
+  - only raw batches that still explain the current code path are kept
   - `archive/raw_runs/20260405_rear_transition_manager_search/`
-  - `archive/raw_runs/tmp_continue/20260405_late_rear_allcontact_followup/`
+  - `archive/raw_runs/20260405_crawl_late_rear_allcontact_followup/`
   - `archive/raw_runs/20260408_trot_footholdz_fix/`
   - `archive/raw_runs/20260408_trot_mix_search/`
   - `archive/raw_runs/20260408_trot_xymix_search/`
