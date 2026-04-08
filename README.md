@@ -45,16 +45,21 @@ The main remaining bottlenecks are now:
   - the optional `straight_tuned` profile is meant only for longer straight-line
     `trot` runs, where it improves forward tracking and posture quality over the
     earlier generic long-horizon behavior.
-- On top of the selective foothold-`z` fix, a narrow retune of the generic
-  `trot` profile gave only small trade-offs, so the current default keeps the
-  simpler generic profile unchanged for turn/disturbance checks.
+- After the selective foothold-`z` fix, the most useful additional generic
+  `trot` improvement came from raising the custom support-reference blend to
+  `support_reference_mix = 0.80`. This improves short-horizon turn and
+  disturbance posture quality while keeping the straight-line `auto` path
+  unchanged.
+- A stronger post-solve `pitch_rebalance_gain` was tested and rejected because
+  it caused early dynamic-gait collapse instead of reducing the persistent
+  positive pitch bias.
 - The currently promoted `trot` validations are:
-  - `trot_straight_tuned_profile_20s/`: no termination, `mean_base_z ≈ 0.405`,
-    `mean |pitch| ≈ 0.149`
-  - `trot_generic_turn_profile_4s/`: no termination, `mean_base_z ≈ 0.381`,
-    `mean |pitch| ≈ 0.138`
-  - `trot_generic_disturb_profile_4s/`: no termination, `mean_base_z ≈ 0.383`,
-    `mean |pitch| ≈ 0.152`
+  - `trot_straight_tuned_profile_20s/`: no termination, `mean_base_z about 0.405`,
+    `mean |pitch| about 0.149`
+  - `trot_default_turn_profile_4s/`: no termination, `mean_base_z about 0.387`,
+    `mean |pitch| about 0.133`
+  - `trot_default_disturb_profile_4s/`: no termination, `mean_base_z about 0.387`,
+    `mean |pitch| about 0.142`
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -181,8 +186,8 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
-- `outputs/curated_runs/trot_generic_turn_profile_4s/`
-- `outputs/curated_runs/trot_generic_disturb_profile_4s/`
+- `outputs/curated_runs/trot_default_turn_profile_4s/`
+- `outputs/curated_runs/trot_default_disturb_profile_4s/`
 - `outputs/curated_runs/trot_straight_tuned_profile_20s/`
 - `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
 - `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`

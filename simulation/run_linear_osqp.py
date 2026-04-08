@@ -72,7 +72,10 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "latched_joint_pd_scale": 0.10,
         "rear_floor_base_scale": 0.65,
         "rear_floor_pitch_gain": 0.20,
-        "support_reference_mix": 0.70,
+        # A slightly stronger support-wrench blend improves short-horizon turn
+        # and disturbance posture quality without changing the straight-tuned
+        # profile used for longer straight-line trot checks.
+        "support_reference_mix": 0.80,
         "min_vertical_force_scale": 1.0,
         "reduced_support_vertical_boost": 0.40,
         "du_xy_max": 10.0,
