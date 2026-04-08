@@ -61,6 +61,16 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
     """Dynamic-gait profile that remains usable across straight, turn, and disturbance checks."""
     return {
         "command_smoothing": 0.0,
+        # Axis-specific orientation / angular-rate Q weighting was the cleanest
+        # way to improve generic trot posture without falling back to heavier
+        # post-hoc heuristics. Pitch weighting gave the first large gain, and
+        # additional roll weighting reduced the remaining turn/disturbance roll
+        # drift while preserving forward tracking over longer horizons too.
+        "Q_theta_roll": 160000.0,
+        "Q_theta_pitch": 240000.0,
+        "Q_w_roll": 16000.0,
+        "Q_w_pitch": 24000.0,
+        "vy_gain": 6.0,
         "vx_gain": 2.3,
         "fy_scale": 0.20,
         "dynamic_fy_roll_gain": 0.0,
@@ -90,6 +100,12 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "pitch_angle_gain": 40.0,
         "pitch_rate_gain": 12.0,
         "pitch_rebalance_ref": 0.20,
+        # The remaining dynamic-gait error was a steady posture bias rather than
+        # a collapse. A small roll/pitch reference bias cleans up that offset
+        # across turn, disturbance, and long straight trot without sacrificing
+        # forward tracking.
+        "roll_ref_offset": 0.03,
+        "pitch_ref_offset": -0.01,
         "pre_swing_gate_min_margin": 0.0,
         "front_pre_swing_gate_min_margin": 0.0,
         "rear_pre_swing_gate_min_margin": 0.0,
@@ -172,7 +188,11 @@ def main() -> None:
     parser.add_argument("--q-p", type=float, default=None)
     parser.add_argument("--q-v", type=float, default=None)
     parser.add_argument("--q-theta", type=float, default=None)
+    parser.add_argument("--q-theta-roll", type=float, default=None, help="Optional roll-axis override for the orientation-state weight.")
+    parser.add_argument("--q-theta-pitch", type=float, default=None, help="Optional pitch-axis override for the orientation-state weight.")
     parser.add_argument("--q-w", type=float, default=None)
+    parser.add_argument("--q-w-roll", type=float, default=None, help="Optional roll-axis override for the angular-rate-state weight.")
+    parser.add_argument("--q-w-pitch", type=float, default=None, help="Optional pitch-axis override for the angular-rate-state weight.")
     parser.add_argument("--r-u", type=float, default=None)
     parser.add_argument("--mu", type=float, default=0.5)
     parser.add_argument("--cmd-alpha", type=float, default=None, help="Override command smoothing factor.")
@@ -357,9 +377,10 @@ def main() -> None:
     parser.add_argument("--roll-rate-gain", type=float, default=None, help="Roll-rate feedback gain used in the desired torque heuristic.")
     parser.add_argument("--pitch-angle-gain", type=float, default=None, help="Pitch-angle feedback gain used in the desired torque heuristic.")
     parser.add_argument("--pitch-rate-gain", type=float, default=None, help="Pitch-rate feedback gain used in the desired torque heuristic.")
-    parser.add_argument("--pitch-ref-offset", type=float, default=None, help="Optional pitch-reference offset (rad) applied inside the custom linear_osqp posture term.")
     parser.add_argument("--yaw-angle-gain", type=float, default=None, help="Yaw-angle feedback gain used in the desired torque heuristic.")
     parser.add_argument("--yaw-rate-gain", type=float, default=None, help="Yaw-rate feedback gain used in the desired torque heuristic.")
+    parser.add_argument("--roll-ref-offset", type=float, default=None, help="Constant roll reference bias [rad] added to the nominal WBInterface orientation reference.")
+    parser.add_argument("--pitch-ref-offset", type=float, default=None, help="Constant pitch reference bias [rad] added to the nominal WBInterface orientation reference.")
     parser.add_argument("--latched-swing-xy-blend", type=float, default=None, help="Blend relatched planned-swing feet toward the swing xy trajectory during the release window.")
     parser.add_argument("--latched-swing-lift-ratio", type=float, default=None, help="Raise relatched swing legs by a fraction of step height while keeping stance support.")
     parser.add_argument("--latched-swing-tau-blend", type=float, default=None, help="Blend relatched planned-swing legs toward swing-space torque during the release window.")
@@ -746,8 +767,16 @@ def main() -> None:
             cfg.linear_osqp_params["Q_v"] = args.q_v
         if args.q_theta is not None:
             cfg.linear_osqp_params["Q_theta"] = args.q_theta
+        if args.q_theta_roll is not None:
+            cfg.linear_osqp_params["Q_theta_roll"] = args.q_theta_roll
+        if args.q_theta_pitch is not None:
+            cfg.linear_osqp_params["Q_theta_pitch"] = args.q_theta_pitch
         if args.q_w is not None:
             cfg.linear_osqp_params["Q_w"] = args.q_w
+        if args.q_w_roll is not None:
+            cfg.linear_osqp_params["Q_w_roll"] = args.q_w_roll
+        if args.q_w_pitch is not None:
+            cfg.linear_osqp_params["Q_w_pitch"] = args.q_w_pitch
         if args.r_u is not None:
             cfg.linear_osqp_params["R_u"] = args.r_u
         if args.cmd_alpha is not None:
@@ -1365,12 +1394,14 @@ def main() -> None:
             cfg.linear_osqp_params["pitch_angle_gain"] = args.pitch_angle_gain
         if args.pitch_rate_gain is not None:
             cfg.linear_osqp_params["pitch_rate_gain"] = args.pitch_rate_gain
-        if args.pitch_ref_offset is not None:
-            cfg.linear_osqp_params["pitch_ref_offset"] = args.pitch_ref_offset
         if args.yaw_angle_gain is not None:
             cfg.linear_osqp_params["yaw_angle_gain"] = args.yaw_angle_gain
         if args.yaw_rate_gain is not None:
             cfg.linear_osqp_params["yaw_rate_gain"] = args.yaw_rate_gain
+        if args.roll_ref_offset is not None:
+            cfg.linear_osqp_params["roll_ref_offset"] = args.roll_ref_offset
+        if args.pitch_ref_offset is not None:
+            cfg.linear_osqp_params["pitch_ref_offset"] = args.pitch_ref_offset
         if args.latched_swing_xy_blend is not None:
             cfg.linear_osqp_params["latched_swing_xy_blend"] = args.latched_swing_xy_blend
         if args.latched_swing_lift_ratio is not None:

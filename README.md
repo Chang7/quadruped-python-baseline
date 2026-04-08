@@ -54,16 +54,21 @@ The main remaining bottlenecks are now:
 - A stronger post-solve `pitch_rebalance_gain` was tested and rejected because
   it caused early dynamic-gait collapse instead of reducing the persistent
   positive pitch bias.
-- A narrow follow-up search also checked stronger pitch gains and explicit
-  negative pitch-reference offsets. Both reduced the mean pitch somewhat, but
-  they consistently gave up too much forward tracking to promote as defaults.
+- The most useful follow-up change after that was a small constant
+  posture-reference bias inside the `linear_osqp` horizon rollout:
+  - `roll_ref_offset = +0.03 rad`
+  - `pitch_ref_offset = -0.01 rad`
+  This treats the remaining dynamic-gait error as a steady posture bias rather
+  than a force-limit problem. The same pair improved the short `turn`,
+  scheduled `disturbance`, and long straight-line `trot` checks at once, so it
+  is now part of the promoted default dynamic profiles.
 - The currently promoted `trot` validations are:
-  - `trot_straight_tuned_profile_20s/`: no termination, `mean_vx about 0.027`,
-    `mean_base_z about 0.405`, `mean |pitch| about 0.150`
-  - `trot_default_turn_profile_4s/`: no termination, `mean_vx about 0.022`,
-    `mean_base_z about 0.390`, `mean |pitch| about 0.131`
-  - `trot_default_disturb_profile_4s/`: no termination, `mean_vx about 0.028`,
-    `mean_base_z about 0.390`, `mean |pitch| about 0.139`
+  - `trot_default_straight_profile_20s/`: no termination, `mean_vx about 0.052`,
+    `mean_base_z about 0.417`, `mean |roll| about 0.013`, `mean |pitch| about 0.050`
+  - `trot_default_turn_profile_10s/`: no termination, `mean_vx about 0.058`,
+    `mean_base_z about 0.430`, `mean |roll| about 0.040`, `mean |pitch| about 0.045`
+  - `trot_default_disturb_profile_10s/`: no termination, `mean_vx about 0.064`,
+    `mean_base_z about 0.431`, `mean |roll| about 0.015`, `mean |pitch| about 0.047`
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -73,10 +78,10 @@ The main remaining bottlenecks are now:
   stabilization problem rather than an early rear recontact failure. The robot
   still settles into a low all-contact posture and eventually drifts into a
   rear-hip invalid contact.
-- The main remaining gap is now more about motion quality and long-horizon
-  contact-transition robustness than basic viability: `trot` still shows a
-  larger pitch bias than the stock baseline, and `crawl` still relies on strong
-  support/recovery windows.
+- The main remaining gap is now more about stock-level tracking quality and
+  long-horizon contact-transition robustness than basic viability: `trot`
+  remains usable across the current straight / turn / disturbance checks, while
+  `crawl` still relies on strong support/recovery windows.
 
 ## Repository Layout
 
@@ -190,9 +195,9 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
-- `outputs/curated_runs/trot_default_turn_profile_4s/`
-- `outputs/curated_runs/trot_default_disturb_profile_4s/`
-- `outputs/curated_runs/trot_straight_tuned_profile_20s/`
+- `outputs/curated_runs/trot_default_turn_profile_10s/`
+- `outputs/curated_runs/trot_default_disturb_profile_10s/`
+- `outputs/curated_runs/trot_default_straight_profile_20s/`
 - `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
 - `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`
 

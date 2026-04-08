@@ -46,7 +46,11 @@ class LinearOSQPConfig:
     Q_p: float = 1e6
     Q_v: float = 1e6
     Q_theta: float = 1e6
+    Q_theta_roll: float | None = None
+    Q_theta_pitch: float | None = None
     Q_w: float = 1e6
+    Q_w_roll: float | None = None
+    Q_w_pitch: float | None = None
     R_u: float = 1e1
     command_smoothing: float = 0.0
     du_xy_max: float = np.inf
@@ -89,17 +93,22 @@ class LinearOSQPConfig:
     roll_rate_gain: float = 6.0
     pitch_angle_gain: float = 28.0
     pitch_rate_gain: float = 8.0
-    pitch_ref_offset: float = 0.0
     yaw_angle_gain: float = 4.0
     yaw_rate_gain: float = 1.5
+    roll_ref_offset: float = 0.0
+    pitch_ref_offset: float = 0.0
 
     def Q(self) -> np.ndarray:
         q = np.zeros((NX, NX), dtype=float)
         # For locomotion we regulate height, not the absolute world x/y position.
         q[IDX_P, IDX_P] = np.diag([0.0, 0.0, self.Q_p])
         q[IDX_V, IDX_V] = np.eye(3) * self.Q_v
-        q[IDX_TH, IDX_TH] = np.eye(3) * self.Q_theta
-        q[IDX_W, IDX_W] = np.eye(3) * self.Q_w
+        q_theta_roll = self.Q_theta if self.Q_theta_roll is None else self.Q_theta_roll
+        q_theta_pitch = self.Q_theta if self.Q_theta_pitch is None else self.Q_theta_pitch
+        q_w_roll = self.Q_w if self.Q_w_roll is None else self.Q_w_roll
+        q_w_pitch = self.Q_w if self.Q_w_pitch is None else self.Q_w_pitch
+        q[IDX_TH, IDX_TH] = np.diag([q_theta_roll, q_theta_pitch, self.Q_theta])
+        q[IDX_W, IDX_W] = np.diag([q_w_roll, q_w_pitch, self.Q_w])
         return q
 
     def QN(self) -> np.ndarray:
@@ -114,7 +123,11 @@ def _get_linear_params() -> dict:
         "Q_p": 2e4,
         "Q_v": 4e4,
         "Q_theta": 2e4,
+        "Q_theta_roll": None,
+        "Q_theta_pitch": None,
         "Q_w": 2e3,
+        "Q_w_roll": None,
+        "Q_w_pitch": None,
         "R_u": 5.0,
         "command_smoothing": 0.35,
         "du_xy_max": 2.5,
@@ -157,9 +170,10 @@ def _get_linear_params() -> dict:
         "roll_rate_gain": 6.0,
         "pitch_angle_gain": 28.0,
         "pitch_rate_gain": 8.0,
-        "pitch_ref_offset": 0.0,
         "yaw_angle_gain": 4.0,
         "yaw_rate_gain": 1.5,
+        "roll_ref_offset": 0.0,
+        "pitch_ref_offset": 0.0,
     }
     maybe = getattr(global_cfg, "linear_osqp_params", None)
     if isinstance(maybe, dict):
@@ -207,7 +221,19 @@ class LinearSRBDController:
             Q_p=float(params["Q_p"]),
             Q_v=float(params["Q_v"]),
             Q_theta=float(params["Q_theta"]),
+            Q_theta_roll=(
+                None if params.get("Q_theta_roll", None) is None else float(params.get("Q_theta_roll"))
+            ),
+            Q_theta_pitch=(
+                None if params.get("Q_theta_pitch", None) is None else float(params.get("Q_theta_pitch"))
+            ),
             Q_w=float(params["Q_w"]),
+            Q_w_roll=(
+                None if params.get("Q_w_roll", None) is None else float(params.get("Q_w_roll"))
+            ),
+            Q_w_pitch=(
+                None if params.get("Q_w_pitch", None) is None else float(params.get("Q_w_pitch"))
+            ),
             R_u=float(params["R_u"]),
             command_smoothing=float(params.get("command_smoothing", 0.0)),
             du_xy_max=float(params.get("du_xy_max", np.inf)),
@@ -254,9 +280,10 @@ class LinearSRBDController:
             roll_rate_gain=float(params.get("roll_rate_gain", 6.0)),
             pitch_angle_gain=float(params.get("pitch_angle_gain", 28.0)),
             pitch_rate_gain=float(params.get("pitch_rate_gain", 8.0)),
-            pitch_ref_offset=float(params.get("pitch_ref_offset", 0.0)),
             yaw_angle_gain=float(params.get("yaw_angle_gain", 4.0)),
             yaw_rate_gain=float(params.get("yaw_rate_gain", 1.5)),
+            roll_ref_offset=float(params.get("roll_ref_offset", 0.0)),
+            pitch_ref_offset=float(params.get("pitch_ref_offset", 0.0)),
         )
 
     @staticmethod
@@ -323,6 +350,8 @@ class LinearSRBDController:
         # WBInterface, integrate the commanded body velocities across the horizon.
         p = np.asarray(x_now[IDX_P], dtype=float).copy()
         th = np.asarray(ref_ori, dtype=float).copy()
+        th[0] += float(cfg.roll_ref_offset)
+        th[1] += float(cfg.pitch_ref_offset)
         for k in range(cfg.horizon + 1):
             if k > 0:
                 p = p + cfg.dt * ref_vel
@@ -906,7 +935,6 @@ class LinearSRBDController:
 
         vel_err = np.asarray(x_ref[IDX_V] - x_init[IDX_V], dtype=float).reshape(3)
         theta_err = _wrap_angle(np.asarray(x_ref[IDX_TH] - x_init[IDX_TH], dtype=float).reshape(3))
-        theta_err[1] = float(_wrap_angle(np.array([theta_err[1] + float(cfg.pitch_ref_offset)], dtype=float))[0])
         ang_err = np.asarray(x_ref[IDX_W] - x_init[IDX_W], dtype=float).reshape(3)
         z_err = float(x_ref[2] - x_init[2])
         support_center = np.mean(np.asarray(foot_rel_world[active_legs, 0:2], dtype=float), axis=0)

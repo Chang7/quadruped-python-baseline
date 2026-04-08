@@ -244,7 +244,11 @@ linear_osqp_params = {
     'Q_p': 2e4,
     'Q_v': 4e4,
     'Q_theta': 2e4,
+    'Q_theta_roll': None,  # optional roll-axis override for the orientation-state weight
+    'Q_theta_pitch': None,  # optional pitch-axis override for the orientation-state weight
     'Q_w': 2e3,
+    'Q_w_roll': None,  # optional roll-axis override for the angular-rate-state weight
+    'Q_w_pitch': None,  # optional pitch-axis override for the angular-rate-state weight
     'R_u': 5.0,
     # Post-solve conditioning to reduce stance transition shocks and lateral drift.
     'command_smoothing': 0.35,   # 0 -> no smoothing, 1 -> keep previous command
@@ -457,9 +461,10 @@ linear_osqp_params = {
     'roll_rate_gain': 6.0,  # roll-rate feedback gain used in desired body torque
     'pitch_angle_gain': 28.0,  # pitch-angle feedback gain used in desired body torque
     'pitch_rate_gain': 8.0,  # pitch-rate feedback gain used in desired body torque
-    'pitch_ref_offset': 0.0,  # optional pitch-reference offset (rad) for the custom linear_osqp posture term
     'yaw_angle_gain': 4.0,  # yaw-angle feedback gain used in desired body torque
     'yaw_rate_gain': 1.5,  # yaw-rate feedback gain used in desired body torque
+    'roll_ref_offset': 0.0,  # constant roll reference bias [rad] added on top of the WBInterface orientation reference
+    'pitch_ref_offset': 0.0,  # constant pitch reference bias [rad] added on top of the WBInterface orientation reference
     'latched_swing_xy_blend': 0.0,  # blend relatched planned-swing feet toward the swing xy trajectory during the release window
     'latched_swing_lift_ratio': 0.0,  # raise a relatched swing leg a fraction of step height to help break contact
     'latched_swing_tau_blend': 0.0,  # blend a relatched planned-swing leg toward swing-space torque during the release window

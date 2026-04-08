@@ -12,9 +12,9 @@ committed to GitHub.
   - only the key milestone runs and current validated defaults are kept here
   - current defaults:
     - `crawl_rearallcontact_rearfloor_default_10s/`
-    - `trot_default_turn_profile_4s/`
-    - `trot_default_disturb_profile_4s/`
-    - `trot_straight_tuned_profile_20s/`
+    - `trot_default_turn_profile_10s/`
+    - `trot_default_disturb_profile_10s/`
+    - `trot_default_straight_profile_20s/`
   - default trot behavior now selects between the `generic` and
     `straight_tuned` profiles automatically based on the command
   - the current promoted `trot` runs use the selective linear-only
@@ -24,6 +24,10 @@ committed to GitHub.
     `support_reference_xy_mix = 1.0`, which improved short-horizon turn and
     disturbance posture quality relative to the earlier generic defaults while
     preserving the separate straight-line `straight_tuned` profile
+  - the current promoted dynamic profiles also apply a small constant
+    posture-reference bias (`roll_ref_offset = +0.03 rad`,
+    `pitch_ref_offset = -0.01 rad`), which cleaned up the remaining steady
+    trot posture bias across turn, disturbance, and long straight-line runs
   - stock-controller sanity checks:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
@@ -31,11 +35,11 @@ committed to GitHub.
     - `stock_sampling_trot_4s_s012_isolated_recheck/`
     - `stock_sampling_trot_turn_4s_y04_recheck/`
     - `stock_sampling_trot_disturb_4s_x48_recheck/`
-  - matching custom-controller short checks:
-    - `trot_default_turn_profile_4s/`
-    - `trot_default_disturb_profile_4s/`
+  - matching custom-controller default checks:
+    - `trot_default_turn_profile_10s/`
+    - `trot_default_disturb_profile_10s/`
   - straight-line tuned `trot` profile checks:
-    - `trot_straight_tuned_profile_20s/`
+    - `trot_default_straight_profile_20s/`
   - key historical milestones:
     - `trot_dynamic_gait_fix/`
     - `trot_dynamic_gait_balanced/`
@@ -52,20 +56,9 @@ committed to GitHub.
   - `archive/raw_runs/20260405_rear_transition_manager_search/`
   - `archive/raw_runs/tmp_continue/20260405_late_rear_allcontact_followup/`
   - `archive/raw_runs/20260408_trot_footholdz_fix/`
-  - `archive/raw_runs/20260408_trot_generic_retune/`
-  - `archive/raw_runs/20260408_trot_pitch_rebalance_search/`
-  - `archive/raw_runs/20260408_trot_supportcentroid_search/`
   - `archive/raw_runs/20260408_trot_mix_search/`
-  - `archive/raw_runs/20260408_trot_mix_vx_search/`
   - `archive/raw_runs/20260408_trot_xymix_search/`
-  - `archive/raw_runs/20260408_trot_followup_narrow_search/`
-  - `archive/raw_runs/20260408_trot_pitchgain_narrow_search/`
-  - `archive/raw_runs/20260408_trot_pitchoffset_search/`
-  - `archive/raw_runs/20260408_trot_pitchoffset_vx_search/`
-  - `archive/raw_runs/20260408_trot_vxgain_on_mix085_search/`
-  - `archive/raw_runs/20260408_pre_mix080_generic_default/`
-  - `archive/raw_runs/20260408_pre_mix085_current_defaults/`
-  - `archive/raw_runs/20260408_pre_selective_trot_baselines/`
+  - `archive/raw_runs/20260408_trot_posture_bias_followup/`
 
 ## Suggested Reading Order
 
