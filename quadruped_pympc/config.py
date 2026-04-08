@@ -409,6 +409,8 @@ linear_osqp_params = {
     'rear_all_contact_stabilization_roll_threshold': None,  # optional abs roll threshold [rad] for keeping the rear late all-contact stabilization window alive
     'rear_all_contact_stabilization_pitch_threshold': None,  # optional abs pitch threshold [rad] for keeping the rear late all-contact stabilization window alive
     'rear_all_contact_stabilization_min_rear_load_share': 0.0,  # keep rear late all-contact stabilization alive while total rear vertical load share stays below this fraction
+    'rear_all_contact_stabilization_min_rear_leg_load_share': 0.0,  # keep rear late all-contact stabilization alive while the active rear leg still carries less than this vertical load-share fraction
+    'rear_all_contact_stabilization_retrigger_limit': 0,  # allow a small number of late all-contact stabilization renewals after the initial rear touchdown seam
     'rear_all_contact_stabilization_rear_floor_delta': 0.0,  # temporarily increase rear-load floor only during rear late all-contact stabilization
     'rear_all_contact_stabilization_front_anchor_z_blend': 0.0,  # blend front stance-target z toward the actual contacted foot height only during rear late all-contact stabilization
     'rear_all_contact_stabilization_rear_anchor_z_blend': 0.0,  # optional rear-leg counterpart for rear late all-contact stance-height blending

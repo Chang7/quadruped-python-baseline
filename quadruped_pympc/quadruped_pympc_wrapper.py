@@ -528,6 +528,12 @@ class QuadrupedPyMPC_Wrapper:
                 data = {'front_touchdown_support_alpha': float(self.wb_interface.front_touchdown_support_alpha)}
             elif obs_name == 'rear_touchdown_support_alpha':
                 data = {'rear_touchdown_support_alpha': float(self.wb_interface.rear_touchdown_support_alpha)}
+            elif obs_name == 'rear_all_contact_stabilization_alpha':
+                data = {
+                    'rear_all_contact_stabilization_alpha': float(
+                        getattr(self.wb_interface, 'rear_all_contact_stabilization_alpha', 0.0)
+                    )
+                }
             elif obs_name == 'rear_handoff_support_active':
                 data = {'rear_handoff_support_active': float(getattr(self.wb_interface, 'rear_handoff_support_active', 0.0))}
             elif obs_name == 'rear_swing_bridge_active':

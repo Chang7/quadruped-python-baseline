@@ -72,7 +72,13 @@ class WBInterface:
             stance_time=stance_time,
             hip_height=cfg.hip_height,
             lift_off_positions=initial_feet_pos,
-            freeze_world_z_during_contact_phases=(cfg.mpc_params['type'] == 'linear_osqp'),
+            # The z-freeze foothold anchoring was introduced to stabilize
+            # dynamic trot turns. In crawl it over-constrains stance/swing
+            # world-z updates and makes the late rear seam much harder to
+            # recover, so keep it limited to dynamic gaits.
+            freeze_world_z_during_contact_phases=(
+                cfg.mpc_params['type'] == 'linear_osqp' and self.is_dynamic_gait
+            ),
             yaw_rate_compensation_scale=0.0,
             yaw_error_compensation_scale=0.0,
         )
@@ -271,6 +277,8 @@ class WBInterface:
         self.front_touchdown_support_alpha = 0.0
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
+        self.rear_all_contact_stabilization_min_rear_leg_load_share = 0.0
+        self.rear_all_contact_stabilization_retrigger_limit = 0
         self.touchdown_contact_vel_z_damping = 0.0
         self.front_touchdown_contact_vel_z_damping = 0.0
         self.rear_touchdown_contact_vel_z_damping = 0.0
@@ -308,6 +316,9 @@ class WBInterface:
 
     def _refresh_linear_timing_params(self) -> None:
         params = getattr(cfg, 'linear_osqp_params', {})
+        self.frg.freeze_world_z_during_contact_phases = bool(
+            cfg.mpc_params['type'] == 'linear_osqp' and self.is_dynamic_gait
+        )
         self.frg.yaw_rate_compensation_scale = float(params.get('foothold_yaw_rate_scale', 0.0))
         self.frg.yaw_error_compensation_scale = float(params.get('foothold_yaw_error_scale', 0.0))
         self.contact_latch_steps = int(params.get('contact_latch_steps', 6))
@@ -785,6 +796,14 @@ class WBInterface:
             float(params.get('rear_all_contact_stabilization_min_rear_load_share', 0.0)),
             0.0,
         )
+        self.rear_all_contact_stabilization_min_rear_leg_load_share = max(
+            float(params.get('rear_all_contact_stabilization_min_rear_leg_load_share', 0.0)),
+            0.0,
+        )
+        self.rear_all_contact_stabilization_retrigger_limit = max(
+            int(params.get('rear_all_contact_stabilization_retrigger_limit', 0)),
+            0,
+        )
         self.pre_swing_gate_hold_s = max(float(params.get('pre_swing_gate_hold_s', 0.0)), 0.0)
         rear_pre_swing_gate_hold_s = params.get('rear_pre_swing_gate_hold_s', None)
         self.rear_pre_swing_gate_hold_s = max(
@@ -883,6 +902,14 @@ class WBInterface:
             all_contact_stabilization_min_rear_load_share=max(
                 float(getattr(self, 'rear_all_contact_stabilization_min_rear_load_share', 0.0)),
                 0.0,
+            ),
+            all_contact_stabilization_min_rear_leg_load_share=max(
+                float(getattr(self, 'rear_all_contact_stabilization_min_rear_leg_load_share', 0.0)),
+                0.0,
+            ),
+            all_contact_stabilization_retrigger_limit=max(
+                int(getattr(self, 'rear_all_contact_stabilization_retrigger_limit', 0)),
+                0,
             ),
             front_transition_guard_hold_s=self.front_rear_transition_guard_hold_s,
             front_transition_guard_forward_scale=self.front_rear_transition_guard_forward_scale,
@@ -1791,7 +1818,12 @@ class WBInterface:
                         pitch_mag = abs(float(base_ori_euler_xyz[1]))
                         ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
                         height_ratio = float(base_pos_measured[2]) / ref_height
-                        front_rear_transition_guard = self.rear_transition_manager.should_delay_front_preswing_for_rear_transition(
+                        (
+                            front_rear_transition_guard,
+                            front_transition_guard_remaining_s,
+                            front_transition_guard_forward_scale,
+                        ) = self.rear_transition_manager.update_front_transition_guard_window(
+                            leg_id,
                             gait_name=self.gait_name,
                             scheduled_swing=scheduled_swing,
                             current_contact=bool(self.current_contact[leg_id]),
@@ -1800,27 +1832,21 @@ class WBInterface:
                             roll_mag=roll_mag,
                             pitch_mag=pitch_mag,
                             height_ratio=height_ratio,
+                            simulation_dt=simulation_dt,
                         )
                     if front_rear_transition_guard:
-                        guard_hold_s = float(self.rear_transition_manager.front_transition_guard_hold_s)
-                        if guard_hold_s > 1e-9:
-                            gate_forward_scale = min(
-                                gate_forward_scale,
-                                float(self.rear_transition_manager.front_transition_guard_forward_scale),
-                            )
-                            self.pre_swing_gate_active[leg_id] = 1
-                            self.pre_swing_gate_elapsed_s[leg_id] = min(
-                                self.pre_swing_gate_elapsed_s[leg_id] + float(simulation_dt),
-                                guard_hold_s,
-                            )
-                            remaining_hold_s = max(
-                                guard_hold_s - self.pre_swing_gate_elapsed_s[leg_id],
-                                0.0,
-                            )
-                            guard_steps = max(int(np.floor(remaining_hold_s / max(self.mpc_dt, 1e-6))) + 1, 1)
-                            guard_steps = min(guard_steps, contact_sequence.shape[1])
-                            contact_sequence[leg_id][0:guard_steps] = 1
-                            continue
+                        gate_forward_scale = min(
+                            gate_forward_scale,
+                            float(front_transition_guard_forward_scale),
+                        )
+                        self.pre_swing_gate_active[leg_id] = 1
+                        guard_steps = max(
+                            int(np.floor(float(front_transition_guard_remaining_s) / max(self.mpc_dt, 1e-6))) + 1,
+                            1,
+                        )
+                        guard_steps = min(guard_steps, contact_sequence.shape[1])
+                        contact_sequence[leg_id][0:guard_steps] = 1
+                        continue
 
                     front_late_release = self._should_front_late_release(
                         leg_id,
@@ -1980,7 +2006,7 @@ class WBInterface:
                         scheduled_swing=bool(scheduled_swing),
                         current_contact=bool(self.current_contact[leg_id]),
                         actual_contact=bool(actual_contact[leg_id]),
-                        recovery_active=rear_transition_recovery_context_active,
+                            recovery_active=rear_transition_recovery_context_active,
                         roll_mag=roll_mag,
                         pitch_mag=pitch_mag,
                         height_ratio=height_ratio,
@@ -2827,6 +2853,7 @@ class WBInterface:
             total_vertical_grf = max(float(np.sum(vertical_grf)), 1e-6)
             rear_load_share = float(np.sum(vertical_grf[2:4])) / total_vertical_grf
             for leg_id in range(2, 4):
+                rear_leg_load_share = float(vertical_grf[leg_id]) / total_vertical_grf
                 recent_rear_touchdown = bool(
                     bool(actual_contact[leg_id]) and (not bool(self.previous_actual_contact[leg_id]))
                 ) or bool(prev_touchdown_reacquire_active[leg_id]) or bool(int(self.touchdown_confirm_active[leg_id]) == 1) or bool(
@@ -2871,6 +2898,11 @@ class WBInterface:
                         float(getattr(self, 'rear_all_contact_stabilization_min_rear_load_share', 0.0)) > 1e-9
                         and float(rear_load_share) + 1e-12
                         < float(getattr(self, 'rear_all_contact_stabilization_min_rear_load_share', 0.0))
+                    )
+                    or (
+                        float(getattr(self, 'rear_all_contact_stabilization_min_rear_leg_load_share', 0.0)) > 1e-9
+                        and float(rear_leg_load_share) + 1e-12
+                        < float(getattr(self, 'rear_all_contact_stabilization_min_rear_leg_load_share', 0.0))
                     )
                     or (
                         float(getattr(self, 'rear_all_contact_stabilization_height_ratio', 0.0)) > 1e-9
@@ -2918,6 +2950,7 @@ class WBInterface:
                     roll_mag=roll_mag,
                     pitch_mag=pitch_mag,
                     rear_load_share=rear_load_share,
+                    rear_leg_load_share=rear_leg_load_share,
                 )
                 if not all_contact_active:
                     continue

@@ -356,6 +356,8 @@ def main() -> None:
     parser.add_argument("--rear-all-contact-stabilization-roll-threshold", type=float, default=None, help="Enable rear-only late all-contact stabilization when |roll| exceeds this threshold.")
     parser.add_argument("--rear-all-contact-stabilization-pitch-threshold", type=float, default=None, help="Enable rear-only late all-contact stabilization when |pitch| exceeds this threshold.")
     parser.add_argument("--rear-all-contact-stabilization-min-rear-load-share", type=float, default=None, help="Keep rear-only late all-contact stabilization alive while total rear vertical load share stays below this fraction.")
+    parser.add_argument("--rear-all-contact-stabilization-min-rear-leg-load-share", type=float, default=None, help="Keep rear-only late all-contact stabilization alive while the active rear leg load share stays below this fraction.")
+    parser.add_argument("--rear-all-contact-stabilization-retrigger-limit", type=int, default=None, help="Allow this many late all-contact stabilization renewals after the initial rear touchdown trigger.")
     parser.add_argument("--rear-all-contact-stabilization-rear-floor-delta", type=float, default=None, help="Temporarily increase rear-load floor only during rear late all-contact stabilization.")
     parser.add_argument("--rear-all-contact-stabilization-z-pos-gain-delta", type=float, default=None, help="Temporarily increase base-height gain only during rear late all-contact stabilization.")
     parser.add_argument("--rear-all-contact-stabilization-roll-angle-gain-delta", type=float, default=None, help="Temporarily increase roll-angle gain only during rear late all-contact stabilization.")
@@ -365,6 +367,11 @@ def main() -> None:
     parser.add_argument("--rear-all-contact-stabilization-rear-anchor-z-blend", type=float, default=None, help="Optional rear-leg counterpart for late all-contact stance z blending.")
     parser.add_argument("--rear-all-contact-stabilization-front-anchor-z-max-delta", type=float, default=None, help="Cap front stance-foot target z at actual z plus this margin only during rear late all-contact stabilization.")
     parser.add_argument("--rear-all-contact-stabilization-rear-anchor-z-max-delta", type=float, default=None, help="Optional rear-leg counterpart for late all-contact stance z capping.")
+    parser.add_argument("--front-rear-transition-guard-hold-s", type=float, default=None, help="Keep a brief front pre-swing guard alive after a rear transition seam starts to settle.")
+    parser.add_argument("--front-rear-transition-guard-forward-scale", type=float, default=None, help="Scale forward reference velocity while the front rear-transition guard is active.")
+    parser.add_argument("--front-rear-transition-guard-roll-threshold", type=float, default=None, help="Absolute roll threshold in radians that can trigger the front rear-transition guard.")
+    parser.add_argument("--front-rear-transition-guard-pitch-threshold", type=float, default=None, help="Absolute pitch threshold in radians that can trigger the front rear-transition guard.")
+    parser.add_argument("--front-rear-transition-guard-height-ratio", type=float, default=None, help="Trigger the front rear-transition guard if base height falls below this ratio of ref_z.")
     parser.add_argument("--touchdown-contact-vel-z-damping", type=float, default=None, help="Task-space vertical damping applied during touchdown support windows.")
     parser.add_argument("--front-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional front-leg override for touchdown support vertical damping.")
     parser.add_argument("--rear-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional rear-leg override for touchdown support vertical damping.")
@@ -718,14 +725,16 @@ def main() -> None:
                         "rear_post_touchdown_support_pitch_threshold": 0.16,
                         "rear_post_touchdown_support_min_grf_z": 0.0,
                         "rear_post_touchdown_support_min_rear_load_share": 0.28,
-                        "rear_all_contact_stabilization_hold_s": 0.06,
+                        "rear_all_contact_stabilization_hold_s": 0.10,
                         "rear_all_contact_stabilization_forward_scale": 0.05,
                         "rear_all_contact_stabilization_front_alpha_scale": 0.5,
                         "rear_all_contact_stabilization_height_ratio": 0.58,
                         "rear_all_contact_stabilization_roll_threshold": 0.26,
                         "rear_all_contact_stabilization_pitch_threshold": 0.10,
                         "rear_all_contact_stabilization_min_rear_load_share": 0.18,
-                        "rear_all_contact_stabilization_rear_floor_delta": 0.35,
+                        "rear_all_contact_stabilization_min_rear_leg_load_share": 0.0,
+                        "rear_all_contact_stabilization_retrigger_limit": 0,
+                        "rear_all_contact_stabilization_rear_floor_delta": 0.50,
                         "rear_all_contact_stabilization_z_pos_gain_delta": 0.0,
                         "rear_all_contact_stabilization_roll_angle_gain_delta": 0.0,
                         "rear_all_contact_stabilization_roll_rate_gain_delta": 0.0,
@@ -1212,6 +1221,26 @@ def main() -> None:
                 float(args.rear_all_contact_stabilization_rear_anchor_z_max_delta),
                 0.0,
             )
+        if args.front_rear_transition_guard_hold_s is not None:
+            cfg.linear_osqp_params["front_rear_transition_guard_hold_s"] = max(
+                float(args.front_rear_transition_guard_hold_s), 0.0
+            )
+        if args.front_rear_transition_guard_forward_scale is not None:
+            cfg.linear_osqp_params["front_rear_transition_guard_forward_scale"] = float(
+                max(min(args.front_rear_transition_guard_forward_scale, 1.0), 0.0)
+            )
+        if args.front_rear_transition_guard_roll_threshold is not None:
+            cfg.linear_osqp_params["front_rear_transition_guard_roll_threshold"] = max(
+                float(args.front_rear_transition_guard_roll_threshold), 0.0
+            )
+        if args.front_rear_transition_guard_pitch_threshold is not None:
+            cfg.linear_osqp_params["front_rear_transition_guard_pitch_threshold"] = max(
+                float(args.front_rear_transition_guard_pitch_threshold), 0.0
+            )
+        if args.front_rear_transition_guard_height_ratio is not None:
+            cfg.linear_osqp_params["front_rear_transition_guard_height_ratio"] = max(
+                float(args.front_rear_transition_guard_height_ratio), 0.0
+            )
         if args.rear_all_contact_stabilization_hold_s is not None:
             cfg.linear_osqp_params["rear_all_contact_stabilization_hold_s"] = max(
                 float(args.rear_all_contact_stabilization_hold_s), 0.0
@@ -1239,6 +1268,15 @@ def main() -> None:
         if args.rear_all_contact_stabilization_min_rear_load_share is not None:
             cfg.linear_osqp_params["rear_all_contact_stabilization_min_rear_load_share"] = max(
                 float(args.rear_all_contact_stabilization_min_rear_load_share), 0.0
+            )
+        if args.rear_all_contact_stabilization_min_rear_leg_load_share is not None:
+            cfg.linear_osqp_params["rear_all_contact_stabilization_min_rear_leg_load_share"] = max(
+                float(args.rear_all_contact_stabilization_min_rear_leg_load_share), 0.0
+            )
+        if args.rear_all_contact_stabilization_retrigger_limit is not None:
+            cfg.linear_osqp_params["rear_all_contact_stabilization_retrigger_limit"] = max(
+                int(args.rear_all_contact_stabilization_retrigger_limit),
+                0,
             )
         if args.rear_all_contact_stabilization_rear_floor_delta is not None:
             cfg.linear_osqp_params["rear_all_contact_stabilization_rear_floor_delta"] = max(

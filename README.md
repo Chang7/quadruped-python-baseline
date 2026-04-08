@@ -79,11 +79,13 @@ The main remaining bottlenecks are now:
   `linear_osqp` mean yaw rate from roughly `0.065` to `0.270 rad/s` without
   breaking the straight or disturbance checks. The current short-horizon
   benchmark bundle is `outputs/report_progress_explainer/trot_benchmark_suite_20260408_yawref/`.
-- The current conservative `crawl` default now reaches roughly the 8.7-second
+- The current conservative `crawl` default now reaches roughly the 8.8-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
   rear late all-contact stabilization window, the front touchdown-support alpha
-  is reduced while a temporary rear-load floor bias is applied.
+  is reduced while a temporary rear-load floor bias is applied. The currently
+  promoted default uses `rear_all_contact_stabilization_rear_floor_delta = 0.50`
+  after a narrow refinement around the earlier `0.45` default.
 - The remaining `crawl` failure should now be read as a late-horizon
   stabilization problem rather than an early rear recontact failure. The robot
   still settles into a low all-contact posture and eventually drifts into a
@@ -221,6 +223,7 @@ comparisons do not depend on ad-hoc commands or mixed horizons.
 Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
+- `outputs/curated_runs/crawl_rearallcontact_rearfloor045_default_10s/`
 - `outputs/curated_runs/trot_current_turn_default_10s/`
 - `outputs/curated_runs/trot_current_disturb_default_10s/`
 - `outputs/curated_runs/trot_current_straight_default_20s/`

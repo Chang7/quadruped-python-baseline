@@ -347,14 +347,19 @@ class LinearSRBDController:
         x_ref[:, IDX_G] = cfg.gravity
 
         # Follow PyMPC's reference semantics for height and terrain-aligned
-        # roll/pitch, but keep yaw-rate commands relative to the current yaw.
-        # Resetting yaw to a fixed absolute reference every MPC step makes a
-        # commanded turn fight against its own yaw-angle feedback once the base
-        # has rotated away from zero.
+        # roll/pitch. For commanded turns, keep yaw-rate commands relative to
+        # the current yaw so the controller does not fight against its own
+        # yaw-angle feedback once the base has already rotated away from zero.
+        # For zero-yaw-rate gaits such as crawl and straight trot, keep the
+        # original WBInterface yaw reference instead; letting the horizon yaw
+        # simply inherit the current body yaw there makes slow gaits drift and
+        # weakens late contact-transition support.
         p = np.asarray(x_now[IDX_P], dtype=float).copy()
-        th = np.asarray(x_now[IDX_TH], dtype=float).copy()
+        th = np.asarray(ref_ori, dtype=float).copy()
         th[0] = float(ref_ori[0]) + float(cfg.roll_ref_offset)
         th[1] = float(ref_ori[1]) + float(cfg.pitch_ref_offset)
+        if abs(float(ref_w[2])) > 1e-9:
+            th[2] = float(x_now[IDX_TH][2])
         for k in range(cfg.horizon + 1):
             if k > 0:
                 p = p + cfg.dt * ref_vel

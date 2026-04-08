@@ -39,6 +39,8 @@ class RearTransitionManager:
         self.all_contact_stabilization_roll_threshold = np.inf
         self.all_contact_stabilization_pitch_threshold = np.inf
         self.all_contact_stabilization_min_rear_load_share = 0.0
+        self.all_contact_stabilization_min_rear_leg_load_share = 0.0
+        self.all_contact_stabilization_retrigger_limit = 0
         self.front_transition_guard_hold_s = 0.0
         self.front_transition_guard_forward_scale = 1.0
         self.front_transition_guard_roll_threshold = np.inf
@@ -79,6 +81,8 @@ class RearTransitionManager:
         all_contact_stabilization_roll_threshold: float | None,
         all_contact_stabilization_pitch_threshold: float | None,
         all_contact_stabilization_min_rear_load_share: float,
+        all_contact_stabilization_min_rear_leg_load_share: float,
+        all_contact_stabilization_retrigger_limit: int,
         front_transition_guard_hold_s: float,
         front_transition_guard_forward_scale: float,
         front_transition_guard_roll_threshold: float | None,
@@ -136,6 +140,11 @@ class RearTransitionManager:
             float(all_contact_stabilization_min_rear_load_share),
             0.0,
         )
+        self.all_contact_stabilization_min_rear_leg_load_share = max(
+            float(all_contact_stabilization_min_rear_leg_load_share),
+            0.0,
+        )
+        self.all_contact_stabilization_retrigger_limit = max(int(all_contact_stabilization_retrigger_limit), 0)
         self.front_transition_guard_hold_s = max(float(front_transition_guard_hold_s), 0.0)
         self.front_transition_guard_forward_scale = float(
             np.clip(front_transition_guard_forward_scale, 0.0, 1.0)
@@ -165,6 +174,8 @@ class RearTransitionManager:
         self.pending_confirm = np.zeros(2, dtype=int)
         self.post_support_remaining_s = np.zeros(2, dtype=float)
         self.all_contact_stabilization_remaining_s = np.zeros(2, dtype=float)
+        self.all_contact_stabilization_retrigger_remaining = np.zeros(2, dtype=int)
+        self.front_transition_guard_remaining_s = np.zeros(2, dtype=float)
 
     @staticmethod
     def _local_leg_index(global_leg_id: int) -> int:
@@ -431,6 +442,7 @@ class RearTransitionManager:
         roll_mag: float,
         pitch_mag: float,
         rear_load_share: float,
+        rear_leg_load_share: float,
     ) -> tuple[int, float, float]:
         if not self.enabled:
             return 0, 1.0, 1.0
@@ -440,24 +452,47 @@ class RearTransitionManager:
                 float(self.all_contact_stabilization_remaining_s[local_leg]),
                 float(self.all_contact_stabilization_hold_s),
             )
+            self.all_contact_stabilization_retrigger_remaining[local_leg] = max(
+                int(self.all_contact_stabilization_retrigger_remaining[local_leg]),
+                int(self.all_contact_stabilization_retrigger_limit),
+            )
 
         remaining = float(self.all_contact_stabilization_remaining_s[local_leg])
-        if remaining <= 1e-9:
-            self.all_contact_stabilization_remaining_s[local_leg] = 0.0
-            return 0, 1.0, 1.0
         if (not planned_stance) or (not actual_contact) or (not all_actual_contact):
             self.all_contact_stabilization_remaining_s[local_leg] = 0.0
+            self.all_contact_stabilization_retrigger_remaining[local_leg] = 0
             return 0, 1.0, 1.0
 
         needs_support = False
         if self.all_contact_stabilization_min_rear_load_share > 1e-9:
             needs_support = float(rear_load_share) + 1e-12 < float(self.all_contact_stabilization_min_rear_load_share)
+        if (not needs_support) and self.all_contact_stabilization_min_rear_leg_load_share > 1e-9:
+            needs_support = float(rear_leg_load_share) + 1e-12 < float(
+                self.all_contact_stabilization_min_rear_leg_load_share
+            )
         if (not needs_support) and self.all_contact_stabilization_height_ratio > 1e-9:
             needs_support = float(height_ratio) <= float(self.all_contact_stabilization_height_ratio)
         if (not needs_support) and np.isfinite(self.all_contact_stabilization_roll_threshold):
             needs_support = float(roll_mag) >= float(self.all_contact_stabilization_roll_threshold)
         if (not needs_support) and np.isfinite(self.all_contact_stabilization_pitch_threshold):
             needs_support = float(pitch_mag) >= float(self.all_contact_stabilization_pitch_threshold)
+
+        if remaining <= 1e-9:
+            if (
+                needs_support
+                and self.all_contact_stabilization_hold_s > 1e-9
+                and int(self.all_contact_stabilization_retrigger_remaining[local_leg]) > 0
+            ):
+                remaining = float(self.all_contact_stabilization_hold_s)
+                self.all_contact_stabilization_remaining_s[local_leg] = remaining
+                self.all_contact_stabilization_retrigger_remaining[local_leg] = max(
+                    int(self.all_contact_stabilization_retrigger_remaining[local_leg]) - 1,
+                    0,
+                )
+            else:
+                self.all_contact_stabilization_remaining_s[local_leg] = 0.0
+                self.all_contact_stabilization_retrigger_remaining[local_leg] = 0
+                return 0, 1.0, 1.0
 
         self.all_contact_stabilization_remaining_s[local_leg] = max(
             0.0,
@@ -640,3 +675,57 @@ class RearTransitionManager:
         ):
             return True
         return False
+
+    def update_front_transition_guard_window(
+        self,
+        global_leg_id: int,
+        *,
+        gait_name: str,
+        scheduled_swing: bool,
+        current_contact: bool,
+        actual_contact: bool,
+        rear_transition_active: bool,
+        roll_mag: float,
+        pitch_mag: float,
+        height_ratio: float,
+        simulation_dt: float,
+    ) -> tuple[int, float, float]:
+        if not self.enabled:
+            return 0, 0.0, 1.0
+
+        local_leg = min(max(int(global_leg_id), 0), 1)
+        hold_s = float(self.front_transition_guard_hold_s)
+        if gait_name != 'crawl' or hold_s <= 1e-9:
+            self.front_transition_guard_remaining_s[local_leg] = 0.0
+            return 0, 0.0, 1.0
+
+        if not (scheduled_swing and current_contact and actual_contact):
+            self.front_transition_guard_remaining_s[local_leg] = 0.0
+            return 0, 0.0, 1.0
+
+        trigger_now = self.should_delay_front_preswing_for_rear_transition(
+            gait_name=gait_name,
+            scheduled_swing=scheduled_swing,
+            current_contact=current_contact,
+            actual_contact=actual_contact,
+            rear_transition_active=rear_transition_active,
+            roll_mag=roll_mag,
+            pitch_mag=pitch_mag,
+            height_ratio=height_ratio,
+        )
+        if trigger_now:
+            self.front_transition_guard_remaining_s[local_leg] = max(
+                float(self.front_transition_guard_remaining_s[local_leg]),
+                hold_s,
+            )
+
+        remaining_s = float(self.front_transition_guard_remaining_s[local_leg])
+        if remaining_s <= 1e-9:
+            self.front_transition_guard_remaining_s[local_leg] = 0.0
+            return 0, 0.0, 1.0
+
+        next_remaining_s = max(0.0, remaining_s - float(simulation_dt))
+        self.front_transition_guard_remaining_s[local_leg] = next_remaining_s
+        if next_remaining_s <= 1e-9 and not trigger_now:
+            return 0, 0.0, 1.0
+        return 1, next_remaining_s, float(self.front_transition_guard_forward_scale)

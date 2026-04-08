@@ -269,6 +269,7 @@ def run_simulation(
         "front_margin_rescue_active",
         "front_margin_rescue_alpha",
         "touchdown_support_alpha",
+        "rear_all_contact_stabilization_alpha",
         "rear_handoff_support_active",
         "rear_swing_bridge_active",
         "rear_swing_release_support_active",

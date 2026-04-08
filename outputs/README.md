@@ -32,6 +32,9 @@ committed to GitHub.
     - `trot_long_after_patch/`
     - `crawl_rear_transition_manager_default_10s/`
     - `crawl_rearallcontact_zcap_default_10s/`
+    - `crawl_rearallcontact_rearfloor045_default_10s/`
+      - immediately previous crawl default before the `rear_floor_delta = 0.50`
+        promotion
   - current promoted `trot` path, in plain words:
     - selective linear-only foothold-`z` anchoring fix
     - yaw-reference rollout fix:
@@ -65,6 +68,9 @@ committed to GitHub.
   - `archive/raw_runs/20260408_trot_mix_search/`
   - `archive/raw_runs/20260408_trot_xymix_search/`
   - `archive/raw_runs/20260408_trot_posture_bias_followup/`
+  - `archive/raw_runs/20260408_crawl_param_sweeps/`
+  - `archive/raw_runs/20260408_crawl_hold010_followup/`
+  - `archive/raw_runs/20260408_crawl_rearfloor_refine/`
   - `archive/raw_runs/20260408_trot_yaw_ref_fix/`
   - `archive/raw_runs/20260408_trot_yaw_gain_after_ref_fix/`
 

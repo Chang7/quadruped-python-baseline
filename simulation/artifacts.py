@@ -106,6 +106,7 @@ def init_run_log(controller_type: str, gait: str, robot: str, scene: str) -> dic
         "front_margin_rescue_active": [],
         "front_margin_rescue_alpha": [],
         "touchdown_support_alpha": [],
+        "rear_all_contact_stabilization_alpha": [],
         "rear_handoff_support_active": [],
         "rear_swing_bridge_active": [],
         "rear_swing_release_support_active": [],
@@ -203,6 +204,8 @@ def append_step(
         log["front_margin_rescue_alpha"].append(_to_numpy(ctrl_state["front_margin_rescue_alpha"]))
     if "touchdown_support_alpha" in ctrl_state:
         log["touchdown_support_alpha"].append(float(ctrl_state["touchdown_support_alpha"]))
+    if "rear_all_contact_stabilization_alpha" in ctrl_state:
+        log["rear_all_contact_stabilization_alpha"].append(float(ctrl_state["rear_all_contact_stabilization_alpha"]))
     if "rear_handoff_support_active" in ctrl_state:
         log["rear_handoff_support_active"].append(float(ctrl_state["rear_handoff_support_active"]))
     if "rear_swing_bridge_active" in ctrl_state:
@@ -278,6 +281,10 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
     front_margin_rescue_active = np.asarray(final_log.get("front_margin_rescue_active", []), dtype=float)
     front_margin_rescue_alpha = np.asarray(final_log.get("front_margin_rescue_alpha", []), dtype=float)
     touchdown_support_alpha = np.asarray(final_log.get("touchdown_support_alpha", []), dtype=float).reshape(-1)
+    rear_all_contact_stabilization_alpha = np.asarray(
+        final_log.get("rear_all_contact_stabilization_alpha", []),
+        dtype=float,
+    ).reshape(-1)
     rear_handoff_support_active = np.asarray(final_log.get("rear_handoff_support_active", []), dtype=float).reshape(-1)
     rear_swing_bridge_active = np.asarray(final_log.get("rear_swing_bridge_active", []), dtype=float).reshape(-1)
     full_contact_recovery_active = np.asarray(final_log.get("full_contact_recovery_active", []), dtype=float).reshape(-1)
@@ -569,6 +576,13 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
     if touchdown_support_alpha.size:
         summary["touchdown_support_alpha_mean"] = _safe_float(float(np.nanmean(touchdown_support_alpha)))
         summary["touchdown_support_alpha_max"] = _safe_float(float(np.nanmax(touchdown_support_alpha)))
+    if rear_all_contact_stabilization_alpha.size:
+        summary["rear_all_contact_stabilization_alpha_mean"] = _safe_float(
+            float(np.nanmean(rear_all_contact_stabilization_alpha))
+        )
+        summary["rear_all_contact_stabilization_alpha_max"] = _safe_float(
+            float(np.nanmax(rear_all_contact_stabilization_alpha))
+        )
     if rear_handoff_support_active.size:
         summary["rear_handoff_support_mean"] = _safe_float(float(np.nanmean(rear_handoff_support_active)))
         summary["rear_handoff_support_max"] = _safe_float(float(np.nanmax(rear_handoff_support_active)))
