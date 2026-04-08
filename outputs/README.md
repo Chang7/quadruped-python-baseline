@@ -15,7 +15,7 @@ committed to GitHub.
     - stock sanity references that explain the scenario choice
     - a few milestone runs that explain how the current code path was reached
   - current defaults:
-    - `crawl_rearallcontact_rearfloor_default_10s/`
+    - `crawl_fronttail010_default_10s/`
     - `trot_current_turn_default_10s/`
     - `trot_current_disturb_default_10s/`
     - `trot_current_straight_default_20s/`
@@ -32,6 +32,8 @@ committed to GitHub.
     - `trot_long_after_patch/`
     - `crawl_rear_transition_manager_default_10s/`
     - `crawl_rearallcontact_zcap_default_10s/`
+    - `crawl_rearallcontact_rearfloor_default_10s/`
+      - previous crawl default before the later front-tail promotion
     - `crawl_rearallcontact_rearfloor045_default_10s/`
       - immediately previous crawl default before the `rear_floor_delta = 0.50`
         promotion
@@ -47,6 +49,16 @@ committed to GitHub.
     - rejected follow-ups kept in archive:
       yaw-aware foothold compensation and extra yaw-gain sweeps after the
       rollout fix did not beat the plain yaw-reference fix
+  - current promoted `crawl` path, in plain words:
+    - keep the delayed front-swing late-recovery hold active for `0.10 s`
+    - keep the remaining front stance leg on touchdown-style support for
+      `0.10 s` after the opposite front leg actually opens swing
+    - keep the earlier rear all-contact rear-floor default (`0.50`) underneath
+      that front-tail logic
+    - rejected follow-ups kept in archive:
+      extra late rear all-contact `hold = 0.14`, extra `z_pos_gain`, and
+      `rear_floor_delta = 0.55` all regressed relative to the plain
+      front-tail `0.10` default
 - `report_progress_explainer/`
   - small shareable bundles only
   - `stock_vs_linear_analysis_20260408/` is the current stock-vs-custom
@@ -71,6 +83,7 @@ committed to GitHub.
   - `archive/raw_runs/20260408_crawl_param_sweeps/`
   - `archive/raw_runs/20260408_crawl_hold010_followup/`
   - `archive/raw_runs/20260408_crawl_rearfloor_refine/`
+  - `archive/raw_runs/20260408_crawl_fronttail_followup/`
   - `archive/raw_runs/20260408_trot_yaw_ref_fix/`
   - `archive/raw_runs/20260408_trot_yaw_gain_after_ref_fix/`
 

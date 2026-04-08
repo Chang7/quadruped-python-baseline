@@ -230,6 +230,8 @@ class WBInterface:
         self.full_contact_recovery_height_ratio = 0.0
         self.full_contact_recovery_recent_window_s = 0.0
         self.full_contact_recovery_rear_support_scale = 0.0
+        self.crawl_front_delayed_swing_recovery_hold_s = 0.0
+        self.crawl_front_stance_support_tail_hold_s = 0.0
         self.pre_swing_gate_hold_s = 0.0
         self.startup_full_stance_elapsed_s = 0.0
         self.contact_latch_elapsed_s = np.zeros(4, dtype=float)
@@ -258,6 +260,7 @@ class WBInterface:
         self.rear_swing_release_support_remaining_s = 0.0
         self.rear_swing_release_support_active = 0
         self.full_contact_recovery_remaining_s = 0.0
+        self.crawl_front_stance_support_tail_remaining_s = 0.0
         self.front_stance_dropout_support_remaining_s = np.zeros(2, dtype=float)
         self.front_touchdown_support_recent_remaining_s = 0.0
         self.rear_swing_bridge_recent_front_remaining_s = 0.0
@@ -769,6 +772,14 @@ class WBInterface:
         )
         self.full_contact_recovery_rear_support_scale = float(
             np.clip(params.get('full_contact_recovery_rear_support_scale', 0.0), 0.0, 1.0)
+        )
+        self.crawl_front_delayed_swing_recovery_hold_s = max(
+            float(params.get('crawl_front_delayed_swing_recovery_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_stance_support_tail_hold_s = max(
+            float(params.get('crawl_front_stance_support_tail_hold_s', 0.0)),
+            0.0,
         )
         self.rear_all_contact_stabilization_hold_s = max(
             float(params.get('rear_all_contact_stabilization_hold_s', 0.0)),
@@ -2359,25 +2370,71 @@ class WBInterface:
                     float(self.full_contact_recovery_recent_window_s) <= 1e-9
                     or float(self.front_touchdown_support_recent_remaining_s) > 1e-9
                 )
+                recovery_posture_needed = bool(
+                    roll_mag >= float(self.full_contact_recovery_roll_threshold)
+                    or pitch_mag >= float(self.full_contact_recovery_pitch_threshold)
+                    or (
+                        float(self.full_contact_recovery_height_ratio) > 1e-9
+                        and height_ratio <= float(self.full_contact_recovery_height_ratio)
+                    )
+                )
                 recovery_trigger = (
                     (not startup_full_stance_active)
                     and recent_gate_ok
                     and all_contact_now
                     and (not all_contact_prev)
-                    and (
-                        roll_mag >= float(self.full_contact_recovery_roll_threshold)
-                        or pitch_mag >= float(self.full_contact_recovery_pitch_threshold)
-                        or (
-                            float(self.full_contact_recovery_height_ratio) > 1e-9
-                            and height_ratio <= float(self.full_contact_recovery_height_ratio)
-                        )
-                    )
+                    and recovery_posture_needed
                 )
                 if recovery_trigger:
                     self.full_contact_recovery_remaining_s = max(
                         float(self.full_contact_recovery_remaining_s),
                         recovery_hold_s,
                     )
+                delayed_front_swing_recovery_hold_s = float(
+                    getattr(self, 'crawl_front_delayed_swing_recovery_hold_s', 0.0)
+                )
+                if delayed_front_swing_recovery_hold_s > 1e-9:
+                    front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
+                    front_realized_stance = (
+                        (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                        & (actual_contact_array[0:2] == 1)
+                    )
+                    front_delayed_swing_recovery = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and all_contact_now
+                        and recovery_posture_needed
+                        and np.any(front_planned_swing & front_realized_stance)
+                    )
+                    if front_delayed_swing_recovery:
+                        self.full_contact_recovery_remaining_s = max(
+                            float(self.full_contact_recovery_remaining_s),
+                            delayed_front_swing_recovery_hold_s,
+                        )
+                front_stance_support_tail_hold_s = float(
+                    getattr(self, 'crawl_front_stance_support_tail_hold_s', 0.0)
+                )
+                if front_stance_support_tail_hold_s > 1e-9:
+                    front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
+                    front_actual_swing_opened = (
+                        (previous_actual_contact_array[0:2] == 1)
+                        & (actual_contact_array[0:2] == 0)
+                    )
+                    front_stance_support_tail_trigger = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and recovery_posture_needed
+                        and (
+                            prev_full_contact_recovery_active
+                            or float(self.full_contact_recovery_remaining_s) > 1e-9
+                        )
+                        and np.any(front_planned_swing & front_actual_swing_opened)
+                    )
+                    if front_stance_support_tail_trigger:
+                        self.crawl_front_stance_support_tail_remaining_s = max(
+                            float(self.crawl_front_stance_support_tail_remaining_s),
+                            front_stance_support_tail_hold_s,
+                        )
                 if self.full_contact_recovery_remaining_s > 1e-9:
                     self.full_contact_recovery_active = 1
                     self.full_contact_recovery_alpha = 1.0
@@ -2891,6 +2948,18 @@ class WBInterface:
                 support_alpha = max(float(support_alpha), 1.0)
                 rear_support_alpha = max(float(rear_support_alpha), 1.0)
                 gate_forward_scale = min(gate_forward_scale, float(post_support_forward_scale))
+            if float(self.crawl_front_stance_support_tail_remaining_s) > 1e-9:
+                for leg_id in range(2):
+                    if bool(contact_sequence[leg_id][0] == 1) and bool(actual_contact[leg_id]):
+                        self.touchdown_support_active[leg_id] = 1
+                        support_alpha = max(float(support_alpha), 1.0)
+                        front_support_alpha = max(float(front_support_alpha), 1.0)
+                self.crawl_front_stance_support_tail_remaining_s = max(
+                    0.0,
+                    float(self.crawl_front_stance_support_tail_remaining_s) - float(simulation_dt),
+                )
+            else:
+                self.crawl_front_stance_support_tail_remaining_s = 0.0
             all_actual_contact = bool(np.all(np.asarray(actual_contact, dtype=int) == 1))
             for leg_id in range(2, 4):
                 all_contact_support_needed = bool(
@@ -3094,7 +3163,6 @@ class WBInterface:
         # Since the MPC close in CoM position, but usually we have desired height for the base,
         # we modify the reference to bring the base at the desired height and not the CoM
         ref_pos[2] -= base_pos[2] - (com_pos[2] + self.frg.com_pos_offset_w[2])
-
 
         if cfg.mpc_params['type'] != 'kinodynamic':
             ref_state = {}
@@ -3695,6 +3763,7 @@ class WBInterface:
         self.front_touchdown_contact_vel_z_damping = 0.0
         self.rear_touchdown_contact_vel_z_damping = 0.0
         self.full_contact_recovery_remaining_s = 0.0
+        self.crawl_front_stance_support_tail_remaining_s = 0.0
         self.front_touchdown_support_recent_remaining_s = 0.0
         self.rear_swing_bridge_recent_front_remaining_s = 0.0
         self.full_contact_recovery_active = 0

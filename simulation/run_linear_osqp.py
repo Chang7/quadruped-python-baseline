@@ -401,6 +401,15 @@ def main() -> None:
     parser.add_argument("--full-contact-recovery-height-ratio", type=float, default=None, help="Trigger late full-contact recovery if base height falls below this ratio of ref_z.")
     parser.add_argument("--full-contact-recovery-recent-window-s", type=float, default=None, help="Require that front touchdown support was active within this recent time window before late full-contact recovery may trigger.")
     parser.add_argument("--full-contact-recovery-rear-support-scale", type=float, default=None, help="Blend rear support alpha into late full-contact recovery after a recent rear touchdown seam.")
+    parser.add_argument("--full-contact-recovery-support-floor-delta", type=float, default=None, help="Temporarily increase support-floor ratio while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-z-pos-gain-delta", type=float, default=None, help="Temporarily increase base-height gain while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-roll-angle-gain-delta", type=float, default=None, help="Temporarily increase roll-angle gain while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-roll-rate-gain-delta", type=float, default=None, help="Temporarily increase roll-rate gain while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-pitch-angle-gain-delta", type=float, default=None, help="Temporarily increase pitch-angle gain while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-pitch-rate-gain-delta", type=float, default=None, help="Temporarily increase pitch-rate gain while late full-contact recovery is active.")
+    parser.add_argument("--full-contact-recovery-side-rebalance-delta", type=float, default=None, help="Temporarily increase signed side-rebalance gain while late full-contact recovery is active.")
+    parser.add_argument("--crawl-front-delayed-swing-recovery-hold-s", type=float, default=None, help="In crawl, briefly keep late full-contact recovery alive when a front leg is nominally opening swing but is still actually/load-bearing in stance.")
+    parser.add_argument("--crawl-front-stance-support-tail-hold-s", type=float, default=None, help="In crawl, keep the remaining front stance leg on touchdown-style support briefly after the opposite front leg actually opens swing.")
     parser.add_argument("--z-pos-gain", type=float, default=None, help="Base-height error gain used in the desired vertical force heuristic.")
     parser.add_argument("--z-vel-gain", type=float, default=None, help="Vertical velocity error gain used in the desired vertical force heuristic.")
     parser.add_argument("--min-vertical-force-scale", type=float, default=None, help="Minimum desired total vertical force as a fraction of body weight.")
@@ -609,6 +618,8 @@ def main() -> None:
                 "full_contact_recovery_pitch_angle_gain_delta": 0.0,
                 "full_contact_recovery_pitch_rate_gain_delta": 0.0,
                 "full_contact_recovery_side_rebalance_delta": 0.0,
+                "crawl_front_delayed_swing_recovery_hold_s": 0.0,
+                "crawl_front_stance_support_tail_hold_s": 0.0,
                 "rear_all_contact_stabilization_rear_floor_delta": 0.0,
                 "rear_all_contact_stabilization_z_pos_gain_delta": 0.0,
                 "rear_all_contact_stabilization_roll_angle_gain_delta": 0.0,
@@ -777,6 +788,8 @@ def main() -> None:
                         "full_contact_recovery_height_ratio": 0.88,
                         "full_contact_recovery_recent_window_s": 0.50,
                         "full_contact_recovery_rear_support_scale": 1.0,
+                        "crawl_front_delayed_swing_recovery_hold_s": 0.10,
+                        "crawl_front_stance_support_tail_hold_s": 0.10,
                         # Once all four feet are back on the ground, the remaining crawl
                         # failure is usually a low rolled posture that the existing
                         # touchdown gains do not quite lift back out of. Give the
@@ -1429,6 +1442,42 @@ def main() -> None:
         if args.full_contact_recovery_rear_support_scale is not None:
             cfg.linear_osqp_params["full_contact_recovery_rear_support_scale"] = float(
                 max(min(args.full_contact_recovery_rear_support_scale, 1.0), 0.0)
+            )
+        if args.full_contact_recovery_support_floor_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_support_floor_delta"] = max(
+                float(args.full_contact_recovery_support_floor_delta), 0.0
+            )
+        if args.full_contact_recovery_z_pos_gain_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_z_pos_gain_delta"] = max(
+                float(args.full_contact_recovery_z_pos_gain_delta), 0.0
+            )
+        if args.full_contact_recovery_roll_angle_gain_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_roll_angle_gain_delta"] = max(
+                float(args.full_contact_recovery_roll_angle_gain_delta), 0.0
+            )
+        if args.full_contact_recovery_roll_rate_gain_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_roll_rate_gain_delta"] = max(
+                float(args.full_contact_recovery_roll_rate_gain_delta), 0.0
+            )
+        if args.full_contact_recovery_pitch_angle_gain_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_pitch_angle_gain_delta"] = max(
+                float(args.full_contact_recovery_pitch_angle_gain_delta), 0.0
+            )
+        if args.full_contact_recovery_pitch_rate_gain_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_pitch_rate_gain_delta"] = max(
+                float(args.full_contact_recovery_pitch_rate_gain_delta), 0.0
+            )
+        if args.full_contact_recovery_side_rebalance_delta is not None:
+            cfg.linear_osqp_params["full_contact_recovery_side_rebalance_delta"] = max(
+                float(args.full_contact_recovery_side_rebalance_delta), 0.0
+            )
+        if args.crawl_front_delayed_swing_recovery_hold_s is not None:
+            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_hold_s"] = max(
+                float(args.crawl_front_delayed_swing_recovery_hold_s), 0.0
+            )
+        if args.crawl_front_stance_support_tail_hold_s is not None:
+            cfg.linear_osqp_params["crawl_front_stance_support_tail_hold_s"] = max(
+                float(args.crawl_front_stance_support_tail_hold_s), 0.0
             )
         if args.pre_swing_gate_hold_s is not None:
             cfg.linear_osqp_params["pre_swing_gate_hold_s"] = max(float(args.pre_swing_gate_hold_s), 0.0)

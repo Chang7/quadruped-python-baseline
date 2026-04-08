@@ -453,6 +453,8 @@ linear_osqp_params = {
     'full_contact_recovery_height_ratio': 0.0,  # trigger late full-contact recovery when base height falls below this ratio of ref_z
     'full_contact_recovery_recent_window_s': 0.0,  # optionally require that a front touchdown support window happened recently before enabling late full-contact recovery
     'full_contact_recovery_rear_support_scale': 0.0,  # optional rear-support alpha blended in during late full-contact recovery when a rear touchdown seam was active recently
+    'crawl_front_delayed_swing_recovery_hold_s': 0.0,  # in crawl, briefly keep late full-contact recovery alive when a front leg is nominally opening swing but is still actually/load-bearing in stance
+    'crawl_front_stance_support_tail_hold_s': 0.0,  # in crawl, keep the remaining front stance leg on touchdown-style support briefly after the opposite front leg actually opens swing
     'pre_swing_gate_hold_s': 0.08,  # maximum extra time to delay lift-off while waiting for enough support margin
     'pre_swing_gate_forward_scale': 1.0,  # scale forward reference velocity while lift-off is delayed by the pre-swing support-margin gate
     'vx_gain': 1.6,  # proportional gain from forward velocity error to desired body force

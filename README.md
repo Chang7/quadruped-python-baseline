@@ -222,6 +222,7 @@ comparisons do not depend on ad-hoc commands or mixed horizons.
 
 Latest locally validated outputs:
 
+- `outputs/curated_runs/crawl_fronttail010_default_10s/`
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor045_default_10s/`
 - `outputs/curated_runs/trot_current_turn_default_10s/`
