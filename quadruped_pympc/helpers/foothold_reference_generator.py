@@ -19,6 +19,8 @@ class FootholdReferenceGenerator:
         vel_moving_average_length=20,
         hip_height: float = None,
         freeze_world_z_during_contact_phases: bool = False,
+        yaw_rate_compensation_scale: float = 0.0,
+        yaw_error_compensation_scale: float = 0.0,
     ) -> None:
         """This method initializes the foothold generator class, which computes
         the reference foothold for the nonlinear MPC.
@@ -44,6 +46,8 @@ class FootholdReferenceGenerator:
         self.lift_off_positions_h = copy.deepcopy(lift_off_positions)  # TODO wrong
         self.touch_down_positions_h = copy.deepcopy(lift_off_positions)  # TODO wrong
         self.freeze_world_z_during_contact_phases = bool(freeze_world_z_during_contact_phases)
+        self.yaw_rate_compensation_scale = float(yaw_rate_compensation_scale)
+        self.yaw_error_compensation_scale = float(yaw_error_compensation_scale)
 
         # The footholds are wrt the hip position, so if we want to change
         # the default foothold, we need to use a variable to add an offset
@@ -64,6 +68,8 @@ class FootholdReferenceGenerator:
         ref_base_xy_lin_vel: np.ndarray,
         hips_position: LegsAttr,
         com_height_nominal: np.float32,
+        base_yaw_rate: float = 0.0,
+        ref_base_yaw_rate: float = 0.0,
     ) -> LegsAttr:
         """Compute the reference footholds for a quadruped robot, using simple geometric heuristics.
 
@@ -136,6 +142,26 @@ class FootholdReferenceGenerator:
 
         # Add the velocity compensation and desired velocity to the feet positions
         ref_feet += vel_offset + error_compensation  # Add offset to all feet
+
+        # Optional yaw-rate-aware foothold compensation for dynamic turning.
+        # Linear OSQP benefits from an explicit turning foothold bias because,
+        # unlike the stock sampling controller, it does not search over richer
+        # turning/support geometries online.
+        if abs(float(self.yaw_rate_compensation_scale)) > 1e-9 or abs(float(self.yaw_error_compensation_scale)) > 1e-9:
+            yaw_ref = float(ref_base_yaw_rate)
+            yaw_now = float(base_yaw_rate)
+            yaw_rate_term = float(self.yaw_rate_compensation_scale) * (self.stance_time / 2.0) * yaw_ref
+            yaw_error_term = (
+                float(self.yaw_error_compensation_scale)
+                * np.sqrt(com_height_nominal / self.gravity_constant)
+                * (yaw_now - yaw_ref)
+            )
+            yaw_comp_gain = yaw_rate_term + yaw_error_term
+            if abs(yaw_comp_gain) > 1e-9:
+                for leg_name in ('FL', 'FR', 'RL', 'RR'):
+                    foot_h = ref_feet[leg_name]
+                    turn_offset = yaw_comp_gain * np.array([-foot_h[1], foot_h[0], 0.0], dtype=float)
+                    ref_feet[leg_name] = foot_h + turn_offset
 
         # Reference footholds in world frame
         ref_feet.FL[0:2] = R_W2H.T @ ref_feet.FL[:2] + base_position[0:2]

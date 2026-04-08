@@ -73,6 +73,8 @@ class WBInterface:
             hip_height=cfg.hip_height,
             lift_off_positions=initial_feet_pos,
             freeze_world_z_during_contact_phases=(cfg.mpc_params['type'] == 'linear_osqp'),
+            yaw_rate_compensation_scale=0.0,
+            yaw_error_compensation_scale=0.0,
         )
 
         # Create swing trajectory generator ------------------------------------------------------
@@ -306,6 +308,8 @@ class WBInterface:
 
     def _refresh_linear_timing_params(self) -> None:
         params = getattr(cfg, 'linear_osqp_params', {})
+        self.frg.yaw_rate_compensation_scale = float(params.get('foothold_yaw_rate_scale', 0.0))
+        self.frg.yaw_error_compensation_scale = float(params.get('foothold_yaw_error_scale', 0.0))
         self.contact_latch_steps = int(params.get('contact_latch_steps', 6))
         self.startup_full_stance_time_s = self._resolve_duration_seconds(
             params, 'startup_full_stance_time_s', 'startup_full_stance_steps', step_dt=self.mpc_dt
@@ -3017,6 +3021,8 @@ class WBInterface:
             ref_base_xy_lin_vel=ref_base_lin_vel[0:2],
             hips_position=hip_pos,
             com_height_nominal=cfg.simulation_params['ref_z'],
+            base_yaw_rate=float(base_ang_vel[2]),
+            ref_base_yaw_rate=float(ref_base_ang_vel[2]),
         )
 
         # Adjust the footholds given the terrain -----------------------------------------------------

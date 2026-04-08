@@ -8,10 +8,14 @@ Helper scripts are grouped by purpose.
   - one-off inspection helpers for existing outputs
 - `launchers/`
   - shell launch scripts for longer runs
+  - also includes fixed benchmark-suite runners such as
+    `run_trot_benchmark_suite.py`
 - `legacy_sweeps/`
   - older temporary sweep scripts kept only for history
 - `report_assets/`
   - scripts that generate figures, GIFs, MP4s, and docx report assets
+  - also includes fixed benchmark dashboards such as
+    `make_trot_benchmark_dashboard.py`
 - `stock_helpers/`
   - stock-stack-specific helper scripts
 

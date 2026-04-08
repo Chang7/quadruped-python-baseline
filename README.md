@@ -29,11 +29,17 @@ The main remaining bottlenecks are now:
   checks without termination.
 - The current `linear_osqp` path no longer shows the earlier immediate collapse
   in short-horizon `trot` tests.
-- The main recent `trot` geometry fix was made in the foothold-reference layer:
-  the custom `linear_osqp` path now freezes the world-frame foothold `z`
-  anchors during ongoing swing/stance updates, while the stock sampling path
-  keeps the original behavior. This removed a front/rear swing-height asymmetry
-  that had been coupling the swing references to body bobbing and pitch.
+- The earlier `trot` geometry fix in the foothold-reference layer is still part
+  of the current custom path: the `linear_osqp` controller freezes the
+  world-frame foothold `z` anchors during ongoing swing/stance updates, while
+  the stock sampling path keeps the original behavior. This removed a
+  front/rear swing-height asymmetry that had been coupling the swing references
+  to body bobbing and pitch.
+- The most important recent `trot + turn` fix was made in the horizon rollout:
+  the `linear_osqp` reference no longer resets yaw toward a fixed zero heading
+  at every MPC update. Instead, roll and pitch are reset to their reference
+  values while yaw evolves relative to the current base heading. This removed a
+  self-opposing yaw-angle feedback loop in turning tests.
 - The current `linear_osqp` path now uses two explicit `trot` profiles instead
   of trying to force one dynamic preset to cover every case:
   - the default `auto` selection routes straight-line `trot` commands to the
@@ -63,12 +69,16 @@ The main remaining bottlenecks are now:
   scheduled `disturbance`, and long straight-line `trot` checks at once, so it
   is now part of the promoted default dynamic profiles.
 - The currently promoted `trot` validations are:
-  - `trot_default_straight_profile_20s/`: no termination, `mean_vx about 0.052`,
-    `mean_base_z about 0.417`, `mean |roll| about 0.013`, `mean |pitch| about 0.050`
-  - `trot_default_turn_profile_10s/`: no termination, `mean_vx about 0.058`,
-    `mean_base_z about 0.430`, `mean |roll| about 0.040`, `mean |pitch| about 0.045`
-  - `trot_default_disturb_profile_10s/`: no termination, `mean_vx about 0.064`,
-    `mean_base_z about 0.431`, `mean |roll| about 0.015`, `mean |pitch| about 0.047`
+  - `trot_current_straight_default_20s/`: no termination, `mean_vx about 0.050`,
+    `mean_base_z about 0.416`, `mean |roll| about 0.013`, `mean |pitch| about 0.052`
+  - `trot_current_turn_default_10s/`: no termination, `mean_base_z about 0.410`,
+    `mean |roll| about 0.024`, `mean |pitch| about 0.059`, `mean wz about 0.311`
+  - `trot_current_disturb_default_10s/`: no termination, `mean_vx about 0.064`,
+    `mean_base_z about 0.430`, `mean |roll| about 0.015`, `mean |pitch| about 0.047`
+- In the fixed short-horizon benchmark, the turning fix raised the custom
+  `linear_osqp` mean yaw rate from roughly `0.065` to `0.270 rad/s` without
+  breaking the straight or disturbance checks. The current short-horizon
+  benchmark bundle is `outputs/report_progress_explainer/trot_benchmark_suite_20260408_yawref/`.
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the
@@ -192,17 +202,35 @@ Longer `crawl` stress check:
 python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 10 --speed 0.12 --yaw-rate 0.0 --artifact-dir outputs/repro_linear_osqp_crawl_long
 ```
 
+Fixed trot benchmark suite:
+
+```bash
+python tools/launchers/run_trot_benchmark_suite.py --skip-existing
+```
+
+This suite standardizes the current main `trot` benchmark around:
+
+- `4 s` straight-line trot
+- `4 s` trot + turn
+- `4 s` trot + scheduled disturbance
+- `20 s` straight-line trot
+
+The suite runner writes a manifest and a compact dashboard so that `trot`
+comparisons do not depend on ad-hoc commands or mixed horizons.
+
 Latest locally validated outputs:
 
 - `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
-- `outputs/curated_runs/trot_default_turn_profile_10s/`
-- `outputs/curated_runs/trot_default_disturb_profile_10s/`
-- `outputs/curated_runs/trot_default_straight_profile_20s/`
+- `outputs/curated_runs/trot_current_turn_default_10s/`
+- `outputs/curated_runs/trot_current_disturb_default_10s/`
+- `outputs/curated_runs/trot_current_straight_default_20s/`
 - `outputs/curated_runs/stock_sampling_trot_turn_4s_y04_recheck/`
 - `outputs/curated_runs/stock_sampling_trot_disturb_4s_x48_recheck/`
+- `outputs/report_progress_explainer/trot_benchmark_suite_20260408_yawref/`
 
 The main active files for the current `trot` / contact-transition work are:
 
+- `quadruped_pympc/controllers/linear_osqp/linear_baseline_controller.py`
 - `quadruped_pympc/helpers/foothold_reference_generator.py`
 - `quadruped_pympc/helpers/rear_transition_manager.py`
 - `quadruped_pympc/interfaces/wb_interface.py`

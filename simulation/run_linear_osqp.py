@@ -75,6 +75,11 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "fy_scale": 0.20,
         "dynamic_fy_roll_gain": 0.0,
         "dynamic_fy_roll_ref": 0.18,
+        # Turn-specific foothold yaw compensation helps the linear controller
+        # generate a clearer turning geometry without affecting straight-line
+        # gait logic.
+        "foothold_yaw_rate_scale": 0.0,
+        "foothold_yaw_error_scale": 0.0,
         "grf_max_scale": 1.0,
         "stance_ramp_steps": 1,
         "joint_pd_scale": 0.10,
@@ -146,6 +151,26 @@ def _dynamic_gait_profile_for(gait: str, trot_profile: str) -> dict[str, float |
     if gait == "trot" and trot_profile == "straight_tuned":
         return _trot_straight_tuned_profile()
     return _dynamic_gait_conservative_profile()
+
+
+def _resolve_dynamic_trot_profile(
+    gait: str,
+    requested_profile: str,
+    yaw_rate: float,
+    lateral_speed: float,
+    disturbance_schedule: list[dict[str, object]],
+) -> str:
+    """Resolve the effective trot dynamic profile from the requested mode.
+
+    `auto` is intentionally conservative and deterministic:
+    - straight-line trot without lateral/yaw/disturbance -> `straight_tuned`
+    - otherwise -> `generic`
+    """
+    if gait != "trot" or requested_profile != "auto":
+        return requested_profile
+    if abs(float(yaw_rate)) < 1e-9 and abs(float(lateral_speed)) < 1e-9 and not disturbance_schedule:
+        return "straight_tuned"
+    return "generic"
 
 
 def main() -> None:
@@ -379,6 +404,8 @@ def main() -> None:
     parser.add_argument("--pitch-rate-gain", type=float, default=None, help="Pitch-rate feedback gain used in the desired torque heuristic.")
     parser.add_argument("--yaw-angle-gain", type=float, default=None, help="Yaw-angle feedback gain used in the desired torque heuristic.")
     parser.add_argument("--yaw-rate-gain", type=float, default=None, help="Yaw-rate feedback gain used in the desired torque heuristic.")
+    parser.add_argument("--foothold-yaw-rate-scale", type=float, default=None, help="Raibert-style yaw-rate foothold compensation scale used by the linear path.")
+    parser.add_argument("--foothold-yaw-error-scale", type=float, default=None, help="Additional yaw-rate tracking-error foothold compensation scale used by the linear path.")
     parser.add_argument("--roll-ref-offset", type=float, default=None, help="Constant roll reference bias [rad] added to the nominal WBInterface orientation reference.")
     parser.add_argument("--pitch-ref-offset", type=float, default=None, help="Constant pitch reference bias [rad] added to the nominal WBInterface orientation reference.")
     parser.add_argument("--latched-swing-xy-blend", type=float, default=None, help="Blend relatched planned-swing feet toward the swing xy trajectory during the release window.")
@@ -419,16 +446,13 @@ def main() -> None:
     parser.add_argument("--contact-rolling-friction", type=float, default=None, help="Optional rolling friction override for floor and foot geoms.")
     args = parser.parse_args()
     disturbance_schedule = _parse_disturbance_pulses(args.disturbance_pulse)
-    selected_dynamic_trot_profile = args.dynamic_trot_profile
-    if args.gait == "trot" and args.dynamic_trot_profile == "auto":
-        if (
-            abs(float(args.yaw_rate)) < 1e-9
-            and abs(float(args.lateral_speed)) < 1e-9
-            and not disturbance_schedule
-        ):
-            selected_dynamic_trot_profile = "straight_tuned"
-        else:
-            selected_dynamic_trot_profile = "generic"
+    selected_dynamic_trot_profile = _resolve_dynamic_trot_profile(
+        gait=args.gait,
+        requested_profile=args.dynamic_trot_profile,
+        yaw_rate=args.yaw_rate,
+        lateral_speed=args.lateral_speed,
+        disturbance_schedule=disturbance_schedule,
+    )
 
     cfg.mpc_params["type"] = args.controller
     cfg.mpc_params["horizon"] = args.horizon
@@ -1398,6 +1422,10 @@ def main() -> None:
             cfg.linear_osqp_params["yaw_angle_gain"] = args.yaw_angle_gain
         if args.yaw_rate_gain is not None:
             cfg.linear_osqp_params["yaw_rate_gain"] = args.yaw_rate_gain
+        if args.foothold_yaw_rate_scale is not None:
+            cfg.linear_osqp_params["foothold_yaw_rate_scale"] = float(args.foothold_yaw_rate_scale)
+        if args.foothold_yaw_error_scale is not None:
+            cfg.linear_osqp_params["foothold_yaw_error_scale"] = float(args.foothold_yaw_error_scale)
         if args.roll_ref_offset is not None:
             cfg.linear_osqp_params["roll_ref_offset"] = args.roll_ref_offset
         if args.pitch_ref_offset is not None:

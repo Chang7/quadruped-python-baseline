@@ -283,6 +283,8 @@ linear_osqp_params = {
     'pitch_rebalance_ref': 0.35,  # pitch angle [rad] that saturates the post-solve rear-load transfer
     'support_centroid_x_gain': 0.0,  # move CoM toward the front/rear center of the current support polygon when swing is active
     'support_centroid_y_gain': 0.0,  # move CoM toward the left/right center of the current support polygon when swing is active
+    'foothold_yaw_rate_scale': 0.0,  # Raibert-style yaw-rate foothold compensation scale used by the linear path
+    'foothold_yaw_error_scale': 0.0,  # additional yaw-rate tracking-error foothold compensation scale
     'pre_swing_lookahead_steps': 3,  # inspect a few upcoming MPC stages so support-centroid shift can start before the first foot lifts
     'pre_swing_front_shift_scale': 1.0,  # amplify pre-swing support-centroid shift when the upcoming swing leg is a front leg
     'pre_swing_rear_shift_scale': 1.0,  # amplify pre-swing support-centroid shift when the upcoming swing leg is a rear leg
