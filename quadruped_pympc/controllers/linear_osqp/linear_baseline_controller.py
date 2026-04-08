@@ -78,6 +78,7 @@ class LinearOSQPConfig:
     pre_swing_front_shift_scale: float = 1.0
     pre_swing_rear_shift_scale: float = 1.0
     support_reference_mix: float = 0.55
+    support_reference_xy_mix: float | None = None
     vx_gain: float = 1.6
     vy_gain: float = 4.5
     z_pos_gain: float = 20.0
@@ -88,6 +89,7 @@ class LinearOSQPConfig:
     roll_rate_gain: float = 6.0
     pitch_angle_gain: float = 28.0
     pitch_rate_gain: float = 8.0
+    pitch_ref_offset: float = 0.0
     yaw_angle_gain: float = 4.0
     yaw_rate_gain: float = 1.5
 
@@ -144,6 +146,7 @@ def _get_linear_params() -> dict:
         "pre_swing_front_shift_scale": 1.0,
         "pre_swing_rear_shift_scale": 1.0,
         "support_reference_mix": 0.55,
+        "support_reference_xy_mix": None,
         "vx_gain": 1.6,
         "vy_gain": 4.5,
         "z_pos_gain": 20.0,
@@ -154,6 +157,7 @@ def _get_linear_params() -> dict:
         "roll_rate_gain": 6.0,
         "pitch_angle_gain": 28.0,
         "pitch_rate_gain": 8.0,
+        "pitch_ref_offset": 0.0,
         "yaw_angle_gain": 4.0,
         "yaw_rate_gain": 1.5,
     }
@@ -235,6 +239,11 @@ class LinearSRBDController:
             pre_swing_front_shift_scale=float(params.get("pre_swing_front_shift_scale", 1.0)),
             pre_swing_rear_shift_scale=float(params.get("pre_swing_rear_shift_scale", 1.0)),
             support_reference_mix=float(np.clip(params.get("support_reference_mix", 0.55), 0.0, 1.0)),
+            support_reference_xy_mix=(
+                None
+                if params.get("support_reference_xy_mix", None) is None
+                else float(np.clip(params.get("support_reference_xy_mix", 0.55), 0.0, 1.0))
+            ),
             vx_gain=float(params.get("vx_gain", 1.6)),
             vy_gain=float(params.get("vy_gain", 4.5)),
             z_pos_gain=float(params.get("z_pos_gain", 20.0)),
@@ -245,6 +254,7 @@ class LinearSRBDController:
             roll_rate_gain=float(params.get("roll_rate_gain", 6.0)),
             pitch_angle_gain=float(params.get("pitch_angle_gain", 28.0)),
             pitch_rate_gain=float(params.get("pitch_rate_gain", 8.0)),
+            pitch_ref_offset=float(params.get("pitch_ref_offset", 0.0)),
             yaw_angle_gain=float(params.get("yaw_angle_gain", 4.0)),
             yaw_rate_gain=float(params.get("yaw_rate_gain", 1.5)),
         )
@@ -896,6 +906,7 @@ class LinearSRBDController:
 
         vel_err = np.asarray(x_ref[IDX_V] - x_init[IDX_V], dtype=float).reshape(3)
         theta_err = _wrap_angle(np.asarray(x_ref[IDX_TH] - x_init[IDX_TH], dtype=float).reshape(3))
+        theta_err[1] = float(_wrap_angle(np.array([theta_err[1] + float(cfg.pitch_ref_offset)], dtype=float))[0])
         ang_err = np.asarray(x_ref[IDX_W] - x_init[IDX_W], dtype=float).reshape(3)
         z_err = float(x_ref[2] - x_init[2])
         support_center = np.mean(np.asarray(foot_rel_world[active_legs, 0:2], dtype=float), axis=0)
@@ -975,8 +986,10 @@ class LinearSRBDController:
             u_active[idx, 2] = fz
 
         mix = float(np.clip(cfg.support_reference_mix, 0.0, 1.0))
+        xy_mix = mix if cfg.support_reference_xy_mix is None else float(np.clip(cfg.support_reference_xy_mix, 0.0, 1.0))
         u = u_guess.copy()
-        u[active_legs] = (1.0 - mix) * u_guess[active_legs] + mix * u_active
+        u[active_legs, 0:2] = (1.0 - xy_mix) * u_guess[active_legs, 0:2] + xy_mix * u_active[:, 0:2]
+        u[active_legs, 2] = (1.0 - mix) * u_guess[active_legs, 2] + mix * u_active[:, 2]
         return u.reshape(NU)
 
     def _support_reference(

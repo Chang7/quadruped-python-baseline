@@ -20,8 +20,10 @@ committed to GitHub.
   - the current promoted `trot` runs use the selective linear-only
     foothold-`z` anchoring fix in the foothold reference generator
   - the current promoted `generic` trot runs also use
-    `support_reference_mix = 0.80`, which improved short-horizon turn and
-    disturbance posture quality relative to the earlier generic default
+    `support_reference_mix = 0.85` together with
+    `support_reference_xy_mix = 1.0`, which improved short-horizon turn and
+    disturbance posture quality relative to the earlier generic defaults while
+    preserving the separate straight-line `straight_tuned` profile
   - stock-controller sanity checks:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
@@ -55,7 +57,14 @@ committed to GitHub.
   - `archive/raw_runs/20260408_trot_supportcentroid_search/`
   - `archive/raw_runs/20260408_trot_mix_search/`
   - `archive/raw_runs/20260408_trot_mix_vx_search/`
+  - `archive/raw_runs/20260408_trot_xymix_search/`
+  - `archive/raw_runs/20260408_trot_followup_narrow_search/`
+  - `archive/raw_runs/20260408_trot_pitchgain_narrow_search/`
+  - `archive/raw_runs/20260408_trot_pitchoffset_search/`
+  - `archive/raw_runs/20260408_trot_pitchoffset_vx_search/`
+  - `archive/raw_runs/20260408_trot_vxgain_on_mix085_search/`
   - `archive/raw_runs/20260408_pre_mix080_generic_default/`
+  - `archive/raw_runs/20260408_pre_mix085_current_defaults/`
   - `archive/raw_runs/20260408_pre_selective_trot_baselines/`
 
 ## Suggested Reading Order

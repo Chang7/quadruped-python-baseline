@@ -72,10 +72,14 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "latched_joint_pd_scale": 0.10,
         "rear_floor_base_scale": 0.65,
         "rear_floor_pitch_gain": 0.20,
-        # A slightly stronger support-wrench blend improves short-horizon turn
-        # and disturbance posture quality without changing the straight-tuned
+        # A stronger support-wrench blend improves short-horizon turn and
+        # disturbance posture quality without changing the straight-tuned
         # profile used for longer straight-line trot checks.
-        "support_reference_mix": 0.80,
+        "support_reference_mix": 0.85,
+        # Keep the more posture-friendly vertical blend while allowing the
+        # horizontal support reference to follow the solved wrench more
+        # aggressively for better forward tracking.
+        "support_reference_xy_mix": 1.0,
         "min_vertical_force_scale": 1.0,
         "reduced_support_vertical_boost": 0.40,
         "du_xy_max": 10.0,
@@ -110,6 +114,7 @@ def _trot_straight_tuned_profile() -> dict[str, float | int]:
             "rear_floor_base_scale": 0.50,
             "rear_floor_pitch_gain": 0.0,
             "support_reference_mix": 0.75,
+            "support_reference_xy_mix": 1.0,
             "reduced_support_vertical_boost": 0.30,
             "pitch_angle_gain": 37.0,
             "pitch_rate_gain": 11.0,
@@ -205,6 +210,7 @@ def main() -> None:
     parser.add_argument("--pre-swing-front-shift-scale", type=float, default=None, help="Scale pre-swing support-centroid shift when the upcoming swing leg is a front leg.")
     parser.add_argument("--pre-swing-rear-shift-scale", type=float, default=None, help="Scale pre-swing support-centroid shift when the upcoming swing leg is a rear leg.")
     parser.add_argument("--support-reference-mix", type=float, default=None, help="Blend factor between the equal-support guess and the solved support wrench reference.")
+    parser.add_argument("--support-reference-xy-mix", type=float, default=None, help="Optional x/y-only blend factor between the equal-support guess and the solved support wrench reference.")
     parser.add_argument("--vx-gain", type=float, default=None, help="Forward velocity-error gain used in the desired body force heuristic.")
     parser.add_argument("--vy-gain", type=float, default=None, help="Lateral velocity-error gain used in the desired body force heuristic.")
     parser.add_argument("--pre-swing-gate-min-margin", type=float, default=None, help="Delay lift-off until the upcoming support polygon margin exceeds this value in meters.")
@@ -351,6 +357,7 @@ def main() -> None:
     parser.add_argument("--roll-rate-gain", type=float, default=None, help="Roll-rate feedback gain used in the desired torque heuristic.")
     parser.add_argument("--pitch-angle-gain", type=float, default=None, help="Pitch-angle feedback gain used in the desired torque heuristic.")
     parser.add_argument("--pitch-rate-gain", type=float, default=None, help="Pitch-rate feedback gain used in the desired torque heuristic.")
+    parser.add_argument("--pitch-ref-offset", type=float, default=None, help="Optional pitch-reference offset (rad) applied inside the custom linear_osqp posture term.")
     parser.add_argument("--yaw-angle-gain", type=float, default=None, help="Yaw-angle feedback gain used in the desired torque heuristic.")
     parser.add_argument("--yaw-rate-gain", type=float, default=None, help="Yaw-rate feedback gain used in the desired torque heuristic.")
     parser.add_argument("--latched-swing-xy-blend", type=float, default=None, help="Blend relatched planned-swing feet toward the swing xy trajectory during the release window.")
@@ -813,6 +820,8 @@ def main() -> None:
             cfg.linear_osqp_params["pre_swing_rear_shift_scale"] = args.pre_swing_rear_shift_scale
         if args.support_reference_mix is not None:
             cfg.linear_osqp_params["support_reference_mix"] = max(min(float(args.support_reference_mix), 1.0), 0.0)
+        if args.support_reference_xy_mix is not None:
+            cfg.linear_osqp_params["support_reference_xy_mix"] = max(min(float(args.support_reference_xy_mix), 1.0), 0.0)
         if args.pre_swing_gate_min_margin is not None:
             cfg.linear_osqp_params["pre_swing_gate_min_margin"] = max(float(args.pre_swing_gate_min_margin), 0.0)
         if args.front_pre_swing_gate_min_margin is not None:
@@ -1356,6 +1365,8 @@ def main() -> None:
             cfg.linear_osqp_params["pitch_angle_gain"] = args.pitch_angle_gain
         if args.pitch_rate_gain is not None:
             cfg.linear_osqp_params["pitch_rate_gain"] = args.pitch_rate_gain
+        if args.pitch_ref_offset is not None:
+            cfg.linear_osqp_params["pitch_ref_offset"] = args.pitch_ref_offset
         if args.yaw_angle_gain is not None:
             cfg.linear_osqp_params["yaw_angle_gain"] = args.yaw_angle_gain
         if args.yaw_rate_gain is not None:

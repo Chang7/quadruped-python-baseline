@@ -46,20 +46,24 @@ The main remaining bottlenecks are now:
     `trot` runs, where it improves forward tracking and posture quality over the
     earlier generic long-horizon behavior.
 - After the selective foothold-`z` fix, the most useful additional generic
-  `trot` improvement came from raising the custom support-reference blend to
-  `support_reference_mix = 0.80`. This improves short-horizon turn and
-  disturbance posture quality while keeping the straight-line `auto` path
-  unchanged.
+  `trot` improvement came from splitting the support-reference blend by axis:
+  the promoted generic profile now uses `support_reference_mix = 0.85` for the
+  vertical component and `support_reference_xy_mix = 1.0` for the horizontal
+  components. This keeps the more posture-friendly vertical blend while letting
+  the horizontal support reference follow the solved wrench more directly.
 - A stronger post-solve `pitch_rebalance_gain` was tested and rejected because
   it caused early dynamic-gait collapse instead of reducing the persistent
   positive pitch bias.
+- A narrow follow-up search also checked stronger pitch gains and explicit
+  negative pitch-reference offsets. Both reduced the mean pitch somewhat, but
+  they consistently gave up too much forward tracking to promote as defaults.
 - The currently promoted `trot` validations are:
-  - `trot_straight_tuned_profile_20s/`: no termination, `mean_base_z about 0.405`,
-    `mean |pitch| about 0.149`
-  - `trot_default_turn_profile_4s/`: no termination, `mean_base_z about 0.387`,
-    `mean |pitch| about 0.133`
-  - `trot_default_disturb_profile_4s/`: no termination, `mean_base_z about 0.387`,
-    `mean |pitch| about 0.142`
+  - `trot_straight_tuned_profile_20s/`: no termination, `mean_vx about 0.027`,
+    `mean_base_z about 0.405`, `mean |pitch| about 0.150`
+  - `trot_default_turn_profile_4s/`: no termination, `mean_vx about 0.022`,
+    `mean_base_z about 0.390`, `mean |pitch| about 0.131`
+  - `trot_default_disturb_profile_4s/`: no termination, `mean_vx about 0.028`,
+    `mean_base_z about 0.390`, `mean |pitch| about 0.139`
 - The current conservative `crawl` default now reaches roughly the 8.7-second
   mark in a 10-second stress test before failure. The most recent improvement
   came from treating the late rear all-contact seam more locally: during the

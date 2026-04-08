@@ -282,6 +282,7 @@ linear_osqp_params = {
     'pre_swing_lookahead_steps': 3,  # inspect a few upcoming MPC stages so support-centroid shift can start before the first foot lifts
     'pre_swing_front_shift_scale': 1.0,  # amplify pre-swing support-centroid shift when the upcoming swing leg is a front leg
     'pre_swing_rear_shift_scale': 1.0,  # amplify pre-swing support-centroid shift when the upcoming swing leg is a rear leg
+    'support_reference_xy_mix': None,  # optional x/y-only blend factor for the solved support-wrench reference; defaults to support_reference_mix
     'pre_swing_gate_min_margin': 0.015,  # keep a scheduled swing leg grounded until the upcoming 3-leg support polygon has this much margin
     'front_pre_swing_gate_min_margin': None,  # optional front-leg override for the required support margin before lift-off
     'rear_pre_swing_gate_min_margin': None,  # optional rear-leg override for the required support margin before lift-off
@@ -456,6 +457,7 @@ linear_osqp_params = {
     'roll_rate_gain': 6.0,  # roll-rate feedback gain used in desired body torque
     'pitch_angle_gain': 28.0,  # pitch-angle feedback gain used in desired body torque
     'pitch_rate_gain': 8.0,  # pitch-rate feedback gain used in desired body torque
+    'pitch_ref_offset': 0.0,  # optional pitch-reference offset (rad) for the custom linear_osqp posture term
     'yaw_angle_gain': 4.0,  # yaw-angle feedback gain used in desired body torque
     'yaw_rate_gain': 1.5,  # yaw-rate feedback gain used in desired body torque
     'latched_swing_xy_blend': 0.0,  # blend relatched planned-swing feet toward the swing xy trajectory during the release window
