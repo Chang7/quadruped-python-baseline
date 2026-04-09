@@ -15,10 +15,12 @@ committed to GitHub.
     - stock sanity references that explain the scenario choice
     - a few milestone runs that explain how the current code path was reached
   - current defaults:
-    - `crawl_fronttail010_default_10s/`
+    - `crawl_current_default_20s/`
+    - `crawl_current_lateloadshare_dedicated_default_20s/`
     - `trot_current_turn_default_10s/`
     - `trot_current_disturb_default_10s/`
     - `trot_current_straight_default_20s/`
+    - `trot_regression_after_crawl_default_10s/`
   - stock sanity references:
     - `stock_sampling_crawl_4s_s003_isolated_recheck/`
     - `stock_sampling_crawl_4s_s006_isolated_recheck/`
@@ -53,12 +55,22 @@ committed to GitHub.
     - keep the delayed front-swing late-recovery hold active for `0.10 s`
     - keep the remaining front stance leg on touchdown-style support for
       `0.10 s` after the opposite front leg actually opens swing
-    - keep the earlier rear all-contact rear-floor default (`0.50`) underneath
-      that front-tail logic
+    - keep the targeted rear close-handoff leg-floor support alive for
+      `0.22 s` after a late rear re-close
+    - keep a separate weak-leg late rear-load-share support window alive for
+      `0.20 s`, with `rear_late_load_share_support_leg_floor_scale_delta = 0.10`
+      instead of renewing the broader close-handoff timer
+    - keep the earlier rear all-contact rear-floor default (`0.55`) underneath
+      that front-tail plus rear close-handoff plus dedicated late-load-share logic
     - rejected follow-ups kept in archive:
-      extra late rear all-contact `hold = 0.14`, extra `z_pos_gain`, and
-      `rear_floor_delta = 0.55` all regressed relative to the plain
-      front-tail `0.10` default
+      `rear_close_handoff_hold_s = 0.18 / 0.20 / 0.24 / 0.26`,
+      `rear_all_contact_release_tail_alpha_scale = 0.25 / 0.50`, and
+      broader front-planted/postdrop recovery re-arms all failed to beat the
+      plain `0.22 / 0.20` close-handoff plus late-load-share setting
+    - rejected late weak-leg floor sweeps kept in archive:
+      `rear_late_load_share_support_leg_floor_scale_delta = 0.06 / 0.08 / 0.09 / 0.11 / 0.12 / 0.16`
+      and extra weak-leg-tail revisits on top of the new default all lost to the
+      plain `0.10 / 0.20` dedicated late-load-share setting
 - `report_progress_explainer/`
   - small shareable bundles only
   - `stock_vs_linear_analysis_20260408/` is the current stock-vs-custom
@@ -72,6 +84,10 @@ committed to GitHub.
   - `archive/current_status_20260404/` is kept only as an older snapshot
 - `archive/`
   - only raw batches that still explain the current code path are kept
+  - top-level `tmp_*` runs were moved into
+    `archive/raw_runs/20260409_root_tmp_migration/` so that `outputs/` stays clean
+  - retired former curated crawl candidates were moved into
+    `archive/raw_runs/20260409_retired_curated_candidates/`
   - `archive/raw_runs/20260405_rear_transition_manager_search/`
   - `archive/raw_runs/20260405_crawl_late_rear_allcontact_followup/`
   - `archive/raw_runs/20260408_trot_footholdz_fix/`
@@ -84,6 +100,21 @@ committed to GitHub.
   - `archive/raw_runs/20260408_crawl_hold010_followup/`
   - `archive/raw_runs/20260408_crawl_rearfloor_refine/`
   - `archive/raw_runs/20260408_crawl_fronttail_followup/`
+  - `archive/raw_runs/20260409_crawl_closehandoff_sweep/`
+  - `archive/raw_runs/20260409_crawl_lateloadshare_dedicated/`
+  - `archive/raw_runs/20260409_crawl_lateloadshare_dedicated_refine/`
+  - `archive/raw_runs/20260409_crawl_lateloadshare_local_opt/`
+  - `archive/raw_runs/20260409_crawl_fronttrigger_debug/`
+  - `archive/raw_runs/20260409_crawl_rearhold_resweep/`
+  - `archive/raw_runs/20260409_crawl_closehandoff_refine/`
+  - `archive/raw_runs/20260409_crawl_release_tail_refine/`
+  - `archive/raw_runs/20260409_crawl_nominalfront_patch/`
+  - `archive/raw_runs/20260409_crawl_closehandoff_plateau/`
+  - `archive/raw_runs/20260409_crawl_weaktail_revisit/`
+  - `archive/raw_runs/20260409_crawl_singleleg_lateload/`
+  - `archive/raw_runs/20260409_crawl_current_default_verify/`
+  - `archive/raw_runs/20260409_trot_regression_after_crawl/`
+  - `archive/raw_runs/20260409_trot_regression_after_crawl_closehandoff014/`
   - `archive/raw_runs/20260408_trot_yaw_ref_fix/`
   - `archive/raw_runs/20260408_trot_yaw_gain_after_ref_fix/`
 

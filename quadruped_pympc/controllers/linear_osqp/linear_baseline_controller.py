@@ -61,6 +61,8 @@ class LinearOSQPConfig:
     dynamic_fy_roll_ref: float = 0.20
     grf_max_scale: float = 1.0
     support_force_floor_ratio: float = 0.0
+    rear_handoff_leg_index: int = -1
+    rear_handoff_leg_floor_scale: float = 0.0
     latched_force_scale: float = 1.0
     latched_floor_scale: float = 1.0
     latched_same_side_receiver_scale: float = 1.0
@@ -138,6 +140,8 @@ def _get_linear_params() -> dict:
         "dynamic_fy_roll_ref": 0.20,
         "grf_max_scale": 0.35,
         "support_force_floor_ratio": 0.0,
+        "rear_handoff_leg_index": -1,
+        "rear_handoff_leg_floor_scale": 0.0,
         "latched_force_scale": 1.0,
         "latched_floor_scale": 1.0,
         "latched_same_side_receiver_scale": 1.0,
@@ -244,6 +248,8 @@ class LinearSRBDController:
             dynamic_fy_roll_ref=float(params.get("dynamic_fy_roll_ref", 0.20)),
             grf_max_scale=float(params.get("grf_max_scale", 1.0)),
             support_force_floor_ratio=float(params.get("support_force_floor_ratio", 0.0)),
+            rear_handoff_leg_index=int(params.get("rear_handoff_leg_index", -1)),
+            rear_handoff_leg_floor_scale=float(params.get("rear_handoff_leg_floor_scale", 0.0)),
             latched_force_scale=float(params.get("latched_force_scale", 1.0)),
             latched_floor_scale=float(params.get("latched_floor_scale", 1.0)),
             latched_same_side_receiver_scale=float(params.get("latched_same_side_receiver_scale", 1.0)),
@@ -668,7 +674,9 @@ class LinearSRBDController:
         u = np.asarray(u_cmd, dtype=float).reshape(4, 3).copy()
         contact_now = np.asarray(contact_now, dtype=bool).reshape(4)
         planned_now = np.asarray(planned_now, dtype=bool).reshape(4)
-        if cfg.support_force_floor_ratio <= 0.0 or not np.any(contact_now):
+        handoff_leg = int(getattr(cfg, "rear_handoff_leg_index", -1))
+        handoff_floor_scale = float(max(getattr(cfg, "rear_handoff_leg_floor_scale", 0.0), 0.0))
+        if (cfg.support_force_floor_ratio <= 0.0 and handoff_floor_scale <= 1e-9) or not np.any(contact_now):
             return u.reshape(NU)
 
         latched = contact_now & (~planned_now)
@@ -678,14 +686,39 @@ class LinearSRBDController:
             n_support = int(np.count_nonzero(contact_now))
             support_mask = contact_now.copy()
             latched = np.zeros(4, dtype=bool)
-        support_floor = (cfg.support_force_floor_ratio * cfg.mass * cfg.gravity) / float(n_support)
+        support_floor = 0.0
+        if cfg.support_force_floor_ratio > 0.0:
+            support_floor = (cfg.support_force_floor_ratio * cfg.mass * cfg.gravity) / float(n_support)
+        lower_full = np.full(4, float(cfg.grf_min), dtype=float)
         if np.any(support_mask):
+            lower_full[support_mask] = np.maximum(lower_full[support_mask], support_floor)
             u[support_mask, 2] = np.maximum(u[support_mask, 2], support_floor)
         if np.any(latched):
             latched_floor_scale = float(np.clip(cfg.latched_floor_scale, 0.0, 1.0))
+            lower_full[latched] = np.maximum(lower_full[latched], latched_floor_scale * support_floor)
             u[latched, 2] = np.maximum(
                 u[latched, 2], latched_floor_scale * support_floor
             )
+        if (
+            handoff_floor_scale > 1e-9
+            and 0 <= handoff_leg < 4
+            and bool(support_mask[handoff_leg])
+            and n_support > 0
+        ):
+            nominal_support_force = (cfg.mass * cfg.gravity) / float(n_support)
+            required_force = handoff_floor_scale * nominal_support_force
+            donor_idx = np.flatnonzero(support_mask)
+            donor_idx = donor_idx[donor_idx != handoff_leg]
+            if donor_idx.size > 0:
+                u[:, 2] = LinearSRBDController._transfer_group_load(
+                    u[:, 2],
+                    np.asarray([handoff_leg], dtype=int),
+                    donor_idx,
+                    required_force,
+                    lower_full,
+                )
+            else:
+                u[handoff_leg, 2] = np.maximum(u[handoff_leg, 2], required_force)
         return u.reshape(NU)
 
     @staticmethod

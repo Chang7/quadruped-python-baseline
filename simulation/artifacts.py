@@ -103,15 +103,54 @@ def init_run_log(controller_type: str, gait: str, robot: str, scene: str) -> dic
         "touchdown_confirm_active": [],
         "touchdown_settle_active": [],
         "touchdown_support_active": [],
+        "rear_retry_contact_signal": [],
+        "rear_touchdown_contact_ready": [],
+        "rear_late_stance_contact_ready": [],
+        "rear_all_contact_support_needed": [],
+        "rear_late_seam_elapsed_s": [],
+        "rear_late_seam_support_active": [],
+        "rear_close_handoff_active": [],
+        "rear_late_load_share_active": [],
+        "rear_late_load_share_alpha": [],
+        "rear_late_load_share_candidate_active": [],
+        "rear_late_load_share_candidate_alpha": [],
+        "rear_late_load_share_trigger_elapsed_s": [],
+        "rear_late_load_share_trigger_enabled": [],
+        "rear_close_handoff_alpha": [],
+        "rear_close_handoff_leg_index": [],
+        "rear_all_contact_weak_leg_alpha": [],
+        "rear_all_contact_weak_leg_index": [],
+        "applied_linear_support_force_floor_ratio": [],
+        "applied_linear_rear_handoff_leg_index": [],
+        "applied_linear_rear_handoff_leg_floor_scale": [],
+        "applied_linear_latched_force_scale": [],
+        "applied_linear_latched_front_receiver_scale": [],
+        "applied_linear_latched_rear_receiver_scale": [],
+        "rear_touchdown_actual_contact_elapsed_s": [],
+        "rear_touchdown_pending_confirm": [],
         "front_margin_rescue_active": [],
         "front_margin_rescue_alpha": [],
         "touchdown_support_alpha": [],
         "rear_all_contact_stabilization_alpha": [],
+        "rear_all_contact_front_planted_tail_alpha": [],
+        "crawl_front_planted_seam_support_alpha": [],
         "rear_handoff_support_active": [],
         "rear_swing_bridge_active": [],
         "rear_swing_release_support_active": [],
         "full_contact_recovery_active": [],
         "full_contact_recovery_alpha": [],
+        "full_contact_recovery_remaining_s": [],
+        "full_contact_recovery_trigger": [],
+        "front_delayed_swing_recovery_trigger": [],
+        "planted_front_recovery_trigger": [],
+        "planted_front_postdrop_recovery_trigger": [],
+        "front_close_gap_trigger": [],
+        "front_late_rearm_trigger": [],
+        "front_planted_posture_tail_trigger": [],
+        "front_late_posture_tail_trigger": [],
+        "crawl_front_stance_support_tail_remaining_s": [],
+        "front_touchdown_support_recent_remaining_s": [],
+        "front_delayed_swing_recovery_spent": [],
         "gate_forward_scale": [],
         "nmpc_grfs": [],
         "nmpc_footholds": [],
@@ -198,6 +237,76 @@ def append_step(
         log["touchdown_settle_active"].append(_to_numpy(ctrl_state["touchdown_settle_active"]))
     if "touchdown_support_active" in ctrl_state:
         log["touchdown_support_active"].append(_to_numpy(ctrl_state["touchdown_support_active"]))
+    if "rear_retry_contact_signal" in ctrl_state:
+        log["rear_retry_contact_signal"].append(_to_numpy(ctrl_state["rear_retry_contact_signal"]))
+    if "rear_touchdown_contact_ready" in ctrl_state:
+        log["rear_touchdown_contact_ready"].append(_to_numpy(ctrl_state["rear_touchdown_contact_ready"]))
+    if "rear_late_stance_contact_ready" in ctrl_state:
+        log["rear_late_stance_contact_ready"].append(_to_numpy(ctrl_state["rear_late_stance_contact_ready"]))
+    if "rear_all_contact_support_needed" in ctrl_state:
+        log["rear_all_contact_support_needed"].append(_to_numpy(ctrl_state["rear_all_contact_support_needed"]))
+    if "rear_late_seam_elapsed_s" in ctrl_state:
+        log["rear_late_seam_elapsed_s"].append(_to_numpy(ctrl_state["rear_late_seam_elapsed_s"]))
+    if "rear_late_seam_support_active" in ctrl_state:
+        log["rear_late_seam_support_active"].append(_to_numpy(ctrl_state["rear_late_seam_support_active"]))
+    if "rear_close_handoff_active" in ctrl_state:
+        log["rear_close_handoff_active"].append(_to_numpy(ctrl_state["rear_close_handoff_active"]))
+    if "rear_late_load_share_active" in ctrl_state:
+        log["rear_late_load_share_active"].append(_to_numpy(ctrl_state["rear_late_load_share_active"]))
+    if "rear_late_load_share_alpha" in ctrl_state:
+        log["rear_late_load_share_alpha"].append(_to_numpy(ctrl_state["rear_late_load_share_alpha"]))
+    if "rear_late_load_share_candidate_active" in ctrl_state:
+        log["rear_late_load_share_candidate_active"].append(
+            _to_numpy(ctrl_state["rear_late_load_share_candidate_active"])
+        )
+    if "rear_late_load_share_candidate_alpha" in ctrl_state:
+        log["rear_late_load_share_candidate_alpha"].append(
+            _to_numpy(ctrl_state["rear_late_load_share_candidate_alpha"])
+        )
+    if "rear_late_load_share_trigger_elapsed_s" in ctrl_state:
+        log["rear_late_load_share_trigger_elapsed_s"].append(
+            _to_numpy(ctrl_state["rear_late_load_share_trigger_elapsed_s"])
+        )
+    if "rear_late_load_share_trigger_enabled" in ctrl_state:
+        log["rear_late_load_share_trigger_enabled"].append(
+            float(ctrl_state["rear_late_load_share_trigger_enabled"])
+        )
+    if "rear_close_handoff_alpha" in ctrl_state:
+        log["rear_close_handoff_alpha"].append(float(ctrl_state["rear_close_handoff_alpha"]))
+    if "rear_close_handoff_leg_index" in ctrl_state:
+        log["rear_close_handoff_leg_index"].append(float(ctrl_state["rear_close_handoff_leg_index"]))
+    if "rear_all_contact_weak_leg_alpha" in ctrl_state:
+        log["rear_all_contact_weak_leg_alpha"].append(float(ctrl_state["rear_all_contact_weak_leg_alpha"]))
+    if "rear_all_contact_weak_leg_index" in ctrl_state:
+        log["rear_all_contact_weak_leg_index"].append(float(ctrl_state["rear_all_contact_weak_leg_index"]))
+    if "applied_linear_support_force_floor_ratio" in ctrl_state:
+        log["applied_linear_support_force_floor_ratio"].append(
+            float(ctrl_state["applied_linear_support_force_floor_ratio"])
+        )
+    if "applied_linear_rear_handoff_leg_index" in ctrl_state:
+        log["applied_linear_rear_handoff_leg_index"].append(
+            float(ctrl_state["applied_linear_rear_handoff_leg_index"])
+        )
+    if "applied_linear_rear_handoff_leg_floor_scale" in ctrl_state:
+        log["applied_linear_rear_handoff_leg_floor_scale"].append(
+            float(ctrl_state["applied_linear_rear_handoff_leg_floor_scale"])
+        )
+    if "applied_linear_latched_force_scale" in ctrl_state:
+        log["applied_linear_latched_force_scale"].append(
+            float(ctrl_state["applied_linear_latched_force_scale"])
+        )
+    if "applied_linear_latched_front_receiver_scale" in ctrl_state:
+        log["applied_linear_latched_front_receiver_scale"].append(
+            float(ctrl_state["applied_linear_latched_front_receiver_scale"])
+        )
+    if "applied_linear_latched_rear_receiver_scale" in ctrl_state:
+        log["applied_linear_latched_rear_receiver_scale"].append(
+            float(ctrl_state["applied_linear_latched_rear_receiver_scale"])
+        )
+    if "rear_touchdown_actual_contact_elapsed_s" in ctrl_state:
+        log["rear_touchdown_actual_contact_elapsed_s"].append(_to_numpy(ctrl_state["rear_touchdown_actual_contact_elapsed_s"]))
+    if "rear_touchdown_pending_confirm" in ctrl_state:
+        log["rear_touchdown_pending_confirm"].append(_to_numpy(ctrl_state["rear_touchdown_pending_confirm"]))
     if "front_margin_rescue_active" in ctrl_state:
         log["front_margin_rescue_active"].append(_to_numpy(ctrl_state["front_margin_rescue_active"]))
     if "front_margin_rescue_alpha" in ctrl_state:
@@ -206,6 +315,14 @@ def append_step(
         log["touchdown_support_alpha"].append(float(ctrl_state["touchdown_support_alpha"]))
     if "rear_all_contact_stabilization_alpha" in ctrl_state:
         log["rear_all_contact_stabilization_alpha"].append(float(ctrl_state["rear_all_contact_stabilization_alpha"]))
+    if "rear_all_contact_front_planted_tail_alpha" in ctrl_state:
+        log["rear_all_contact_front_planted_tail_alpha"].append(
+            float(ctrl_state["rear_all_contact_front_planted_tail_alpha"])
+        )
+    if "crawl_front_planted_seam_support_alpha" in ctrl_state:
+        log["crawl_front_planted_seam_support_alpha"].append(
+            float(ctrl_state["crawl_front_planted_seam_support_alpha"])
+        )
     if "rear_handoff_support_active" in ctrl_state:
         log["rear_handoff_support_active"].append(float(ctrl_state["rear_handoff_support_active"]))
     if "rear_swing_bridge_active" in ctrl_state:
@@ -216,6 +333,42 @@ def append_step(
         log["full_contact_recovery_active"].append(_to_numpy(ctrl_state["full_contact_recovery_active"]))
     if "full_contact_recovery_alpha" in ctrl_state:
         log["full_contact_recovery_alpha"].append(float(ctrl_state["full_contact_recovery_alpha"]))
+    if "full_contact_recovery_remaining_s" in ctrl_state:
+        log["full_contact_recovery_remaining_s"].append(float(ctrl_state["full_contact_recovery_remaining_s"]))
+    if "full_contact_recovery_trigger" in ctrl_state:
+        log["full_contact_recovery_trigger"].append(float(ctrl_state["full_contact_recovery_trigger"]))
+    if "front_delayed_swing_recovery_trigger" in ctrl_state:
+        log["front_delayed_swing_recovery_trigger"].append(
+            float(ctrl_state["front_delayed_swing_recovery_trigger"])
+        )
+    if "planted_front_recovery_trigger" in ctrl_state:
+        log["planted_front_recovery_trigger"].append(float(ctrl_state["planted_front_recovery_trigger"]))
+    if "planted_front_postdrop_recovery_trigger" in ctrl_state:
+        log["planted_front_postdrop_recovery_trigger"].append(
+            float(ctrl_state["planted_front_postdrop_recovery_trigger"])
+        )
+    if "front_close_gap_trigger" in ctrl_state:
+        log["front_close_gap_trigger"].append(float(ctrl_state["front_close_gap_trigger"]))
+    if "front_late_rearm_trigger" in ctrl_state:
+        log["front_late_rearm_trigger"].append(float(ctrl_state["front_late_rearm_trigger"]))
+    if "front_planted_posture_tail_trigger" in ctrl_state:
+        log["front_planted_posture_tail_trigger"].append(
+            float(ctrl_state["front_planted_posture_tail_trigger"])
+        )
+    if "front_late_posture_tail_trigger" in ctrl_state:
+        log["front_late_posture_tail_trigger"].append(float(ctrl_state["front_late_posture_tail_trigger"]))
+    if "crawl_front_stance_support_tail_remaining_s" in ctrl_state:
+        log["crawl_front_stance_support_tail_remaining_s"].append(
+            float(ctrl_state["crawl_front_stance_support_tail_remaining_s"])
+        )
+    if "front_touchdown_support_recent_remaining_s" in ctrl_state:
+        log["front_touchdown_support_recent_remaining_s"].append(
+            float(ctrl_state["front_touchdown_support_recent_remaining_s"])
+        )
+    if "front_delayed_swing_recovery_spent" in ctrl_state:
+        log["front_delayed_swing_recovery_spent"].append(
+            _to_numpy(ctrl_state["front_delayed_swing_recovery_spent"])
+        )
     if "gate_forward_scale" in ctrl_state:
         log["gate_forward_scale"].append(_to_numpy(ctrl_state["gate_forward_scale"]))
     if "nmpc_GRFs" in ctrl_state:
@@ -285,6 +438,73 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
         final_log.get("rear_all_contact_stabilization_alpha", []),
         dtype=float,
     ).reshape(-1)
+    rear_all_contact_front_planted_tail_alpha = np.asarray(
+        final_log.get("rear_all_contact_front_planted_tail_alpha", []),
+        dtype=float,
+    ).reshape(-1)
+    crawl_front_planted_seam_support_alpha = np.asarray(
+        final_log.get("crawl_front_planted_seam_support_alpha", []),
+        dtype=float,
+    ).reshape(-1)
+    rear_late_seam_elapsed_s = np.asarray(final_log.get("rear_late_seam_elapsed_s", []), dtype=float)
+    rear_late_seam_support_active = np.asarray(final_log.get("rear_late_seam_support_active", []), dtype=float)
+    rear_close_handoff_active = np.asarray(final_log.get("rear_close_handoff_active", []), dtype=float)
+    rear_late_load_share_active = np.asarray(final_log.get("rear_late_load_share_active", []), dtype=float)
+    rear_late_load_share_alpha = np.asarray(final_log.get("rear_late_load_share_alpha", []), dtype=float)
+    rear_late_load_share_candidate_active = np.asarray(
+        final_log.get("rear_late_load_share_candidate_active", []),
+        dtype=float,
+    )
+    rear_late_load_share_candidate_alpha = np.asarray(
+        final_log.get("rear_late_load_share_candidate_alpha", []),
+        dtype=float,
+    )
+    rear_late_load_share_trigger_elapsed_s = np.asarray(
+        final_log.get("rear_late_load_share_trigger_elapsed_s", []),
+        dtype=float,
+    )
+    rear_late_load_share_trigger_enabled = np.asarray(
+        final_log.get("rear_late_load_share_trigger_enabled", []),
+        dtype=float,
+    ).reshape(-1)
+    rear_close_handoff_alpha = np.asarray(final_log.get("rear_close_handoff_alpha", []), dtype=float).reshape(-1)
+    rear_close_handoff_leg_index = np.asarray(final_log.get("rear_close_handoff_leg_index", []), dtype=float).reshape(-1)
+    rear_all_contact_weak_leg_alpha = np.asarray(
+        final_log.get("rear_all_contact_weak_leg_alpha", []),
+        dtype=float,
+    ).reshape(-1)
+    rear_all_contact_weak_leg_index = np.asarray(
+        final_log.get("rear_all_contact_weak_leg_index", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_support_force_floor_ratio = np.asarray(
+        final_log.get("applied_linear_support_force_floor_ratio", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_rear_handoff_leg_index = np.asarray(
+        final_log.get("applied_linear_rear_handoff_leg_index", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_rear_handoff_leg_floor_scale = np.asarray(
+        final_log.get("applied_linear_rear_handoff_leg_floor_scale", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_latched_force_scale = np.asarray(
+        final_log.get("applied_linear_latched_force_scale", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_latched_front_receiver_scale = np.asarray(
+        final_log.get("applied_linear_latched_front_receiver_scale", []),
+        dtype=float,
+    ).reshape(-1)
+    applied_linear_latched_rear_receiver_scale = np.asarray(
+        final_log.get("applied_linear_latched_rear_receiver_scale", []),
+        dtype=float,
+    ).reshape(-1)
+    rear_all_contact_support_needed = np.asarray(
+        final_log.get("rear_all_contact_support_needed", []),
+        dtype=float,
+    )
     rear_handoff_support_active = np.asarray(final_log.get("rear_handoff_support_active", []), dtype=float).reshape(-1)
     rear_swing_bridge_active = np.asarray(final_log.get("rear_swing_bridge_active", []), dtype=float).reshape(-1)
     full_contact_recovery_active = np.asarray(final_log.get("full_contact_recovery_active", []), dtype=float).reshape(-1)
@@ -348,6 +568,77 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
             "RL": _safe_float(grf_leg_norms[:, 2].mean()),
             "RR": _safe_float(grf_leg_norms[:, 3].mean()),
         }
+        rear_vertical_grf = np.maximum(foot_grf[:, 2:4, 2], 0.0)
+        rear_total_vertical_grf = np.sum(rear_vertical_grf, axis=1)
+        valid_rear_pair = rear_total_vertical_grf > 1e-6
+        if np.any(valid_rear_pair):
+            rear_pair_shares = np.zeros_like(rear_vertical_grf, dtype=float)
+            rear_pair_shares[valid_rear_pair] = (
+                rear_vertical_grf[valid_rear_pair]
+                / rear_total_vertical_grf[valid_rear_pair, None]
+            )
+            weak_rear_leg_share = np.min(rear_pair_shares[valid_rear_pair], axis=1)
+            weak_rear_leg_index = np.argmin(rear_pair_shares[valid_rear_pair], axis=1)
+            summary["rear_pair_load_share_mean"] = {
+                "RL": _safe_float(float(np.mean(rear_pair_shares[valid_rear_pair, 0]))),
+                "RR": _safe_float(float(np.mean(rear_pair_shares[valid_rear_pair, 1]))),
+            }
+            summary["rear_pair_weak_leg_share_mean"] = _safe_float(float(np.mean(weak_rear_leg_share)))
+            summary["rear_pair_weak_leg_share_p10"] = _safe_float(float(np.percentile(weak_rear_leg_share, 10)))
+            summary["rear_pair_weaker_leg_ratio"] = {
+                "RL": _safe_float(float(np.mean(weak_rear_leg_index == 0))),
+                "RR": _safe_float(float(np.mean(weak_rear_leg_index == 1))),
+            }
+
+            if (
+                rear_all_contact_support_needed.ndim == 2
+                and rear_all_contact_support_needed.shape[0] == rear_vertical_grf.shape[0]
+                and rear_all_contact_support_needed.shape[1] >= 4
+            ):
+                rear_need_mask = np.any(rear_all_contact_support_needed[:, 2:4] > 0.5, axis=1)
+            else:
+                rear_need_mask = np.zeros(rear_vertical_grf.shape[0], dtype=bool)
+            need_valid_mask = valid_rear_pair & rear_need_mask
+            if np.any(need_valid_mask):
+                need_shares = rear_pair_shares[need_valid_mask]
+                need_weak_share = np.min(need_shares, axis=1)
+                need_weak_index = np.argmin(need_shares, axis=1)
+                summary["rear_pair_load_share_when_needed_mean"] = {
+                    "RL": _safe_float(float(np.mean(need_shares[:, 0]))),
+                    "RR": _safe_float(float(np.mean(need_shares[:, 1]))),
+                }
+                summary["rear_pair_weak_leg_share_when_needed_mean"] = _safe_float(
+                    float(np.mean(need_weak_share))
+                )
+                summary["rear_pair_weak_leg_share_when_needed_p10"] = _safe_float(
+                    float(np.percentile(need_weak_share, 10))
+                )
+                summary["rear_pair_weaker_leg_when_needed_ratio"] = {
+                    "RL": _safe_float(float(np.mean(need_weak_index == 0))),
+                    "RR": _safe_float(float(np.mean(need_weak_index == 1))),
+                }
+                for tail_len in (600, 300):
+                    tail_mask = need_valid_mask.copy()
+                    tail_mask[: max(0, tail_mask.size - tail_len)] = False
+                    if not np.any(tail_mask):
+                        continue
+                    tail_shares = rear_pair_shares[tail_mask]
+                    tail_weak_share = np.min(tail_shares, axis=1)
+                    tail_weak_index = np.argmin(tail_shares, axis=1)
+                    summary[f"rear_pair_load_share_tail{tail_len}_mean"] = {
+                        "RL": _safe_float(float(np.mean(tail_shares[:, 0]))),
+                        "RR": _safe_float(float(np.mean(tail_shares[:, 1]))),
+                    }
+                    summary[f"rear_pair_weak_leg_share_tail{tail_len}_mean"] = _safe_float(
+                        float(np.mean(tail_weak_share))
+                    )
+                    summary[f"rear_pair_weak_leg_share_tail{tail_len}_p10"] = _safe_float(
+                        float(np.percentile(tail_weak_share, 10))
+                    )
+                    summary[f"rear_pair_weaker_leg_tail{tail_len}_ratio"] = {
+                        "RL": _safe_float(float(np.mean(tail_weak_index == 0))),
+                        "RR": _safe_float(float(np.mean(tail_weak_index == 1))),
+                    }
     if action_leg_norms is not None:
         summary["mean_action_leg_norm"] = {
             "FL": _safe_float(action_leg_norms[:, 0].mean()),
@@ -582,6 +873,153 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
         )
         summary["rear_all_contact_stabilization_alpha_max"] = _safe_float(
             float(np.nanmax(rear_all_contact_stabilization_alpha))
+        )
+    if rear_all_contact_front_planted_tail_alpha.size:
+        summary["rear_all_contact_front_planted_tail_alpha_mean"] = _safe_float(
+            float(np.nanmean(rear_all_contact_front_planted_tail_alpha))
+        )
+        summary["rear_all_contact_front_planted_tail_alpha_max"] = _safe_float(
+            float(np.nanmax(rear_all_contact_front_planted_tail_alpha))
+        )
+    if crawl_front_planted_seam_support_alpha.size:
+        summary["crawl_front_planted_seam_support_alpha_mean"] = _safe_float(
+            float(np.nanmean(crawl_front_planted_seam_support_alpha))
+        )
+        summary["crawl_front_planted_seam_support_alpha_max"] = _safe_float(
+            float(np.nanmax(crawl_front_planted_seam_support_alpha))
+        )
+    if rear_late_seam_elapsed_s.ndim == 2 and rear_late_seam_elapsed_s.shape[1] >= 4:
+        summary["rear_late_seam_elapsed_max_s"] = {
+            "RL": _safe_float(float(np.nanmax(rear_late_seam_elapsed_s[:, 2]))),
+            "RR": _safe_float(float(np.nanmax(rear_late_seam_elapsed_s[:, 3]))),
+        }
+    if rear_late_seam_support_active.ndim == 2 and rear_late_seam_support_active.shape[1] >= 4:
+        summary["rear_late_seam_support_ratio"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_seam_support_active[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_seam_support_active[:, 3]))),
+        }
+    if rear_close_handoff_active.ndim == 2 and rear_close_handoff_active.shape[1] >= 4:
+        summary["rear_close_handoff_ratio"] = {
+            "RL": _safe_float(float(np.nanmean(rear_close_handoff_active[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_close_handoff_active[:, 3]))),
+        }
+    if rear_late_load_share_active.ndim == 2 and rear_late_load_share_active.shape[1] >= 4:
+        summary["rear_late_load_share_ratio"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_load_share_active[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_load_share_active[:, 3]))),
+        }
+    if rear_late_load_share_alpha.ndim == 2 and rear_late_load_share_alpha.shape[1] >= 4:
+        summary["rear_late_load_share_alpha_mean"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_load_share_alpha[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_load_share_alpha[:, 3]))),
+        }
+        summary["rear_late_load_share_alpha_max"] = {
+            "RL": _safe_float(float(np.nanmax(rear_late_load_share_alpha[:, 2]))),
+            "RR": _safe_float(float(np.nanmax(rear_late_load_share_alpha[:, 3]))),
+        }
+    if (
+        rear_late_load_share_candidate_active.ndim == 2
+        and rear_late_load_share_candidate_active.shape[1] >= 4
+    ):
+        summary["rear_late_load_share_candidate_ratio"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_load_share_candidate_active[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_load_share_candidate_active[:, 3]))),
+        }
+    if (
+        rear_late_load_share_candidate_alpha.ndim == 2
+        and rear_late_load_share_candidate_alpha.shape[1] >= 4
+    ):
+        summary["rear_late_load_share_candidate_alpha_mean"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_load_share_candidate_alpha[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_load_share_candidate_alpha[:, 3]))),
+        }
+        summary["rear_late_load_share_candidate_alpha_max"] = {
+            "RL": _safe_float(float(np.nanmax(rear_late_load_share_candidate_alpha[:, 2]))),
+            "RR": _safe_float(float(np.nanmax(rear_late_load_share_candidate_alpha[:, 3]))),
+        }
+    if (
+        rear_late_load_share_trigger_elapsed_s.ndim == 2
+        and rear_late_load_share_trigger_elapsed_s.shape[1] >= 4
+    ):
+        summary["rear_late_load_share_trigger_elapsed_mean"] = {
+            "RL": _safe_float(float(np.nanmean(rear_late_load_share_trigger_elapsed_s[:, 2]))),
+            "RR": _safe_float(float(np.nanmean(rear_late_load_share_trigger_elapsed_s[:, 3]))),
+        }
+        summary["rear_late_load_share_trigger_elapsed_max"] = {
+            "RL": _safe_float(float(np.nanmax(rear_late_load_share_trigger_elapsed_s[:, 2]))),
+            "RR": _safe_float(float(np.nanmax(rear_late_load_share_trigger_elapsed_s[:, 3]))),
+        }
+    if rear_late_load_share_trigger_enabled.size:
+        summary["rear_late_load_share_trigger_enabled_mean"] = _safe_float(
+            float(np.nanmean(rear_late_load_share_trigger_enabled))
+        )
+        summary["rear_late_load_share_trigger_enabled_max"] = _safe_float(
+            float(np.nanmax(rear_late_load_share_trigger_enabled))
+        )
+    if rear_close_handoff_alpha.size:
+        summary["rear_close_handoff_alpha_mean"] = _safe_float(float(np.nanmean(rear_close_handoff_alpha)))
+        summary["rear_close_handoff_alpha_max"] = _safe_float(float(np.nanmax(rear_close_handoff_alpha)))
+    if rear_close_handoff_leg_index.size:
+        summary["rear_close_handoff_leg_index_last"] = _safe_float(float(rear_close_handoff_leg_index[-1]))
+    if rear_all_contact_weak_leg_alpha.size:
+        summary["rear_all_contact_weak_leg_alpha_mean"] = _safe_float(
+            float(np.nanmean(rear_all_contact_weak_leg_alpha))
+        )
+        summary["rear_all_contact_weak_leg_alpha_max"] = _safe_float(
+            float(np.nanmax(rear_all_contact_weak_leg_alpha))
+        )
+    if rear_all_contact_weak_leg_index.size:
+        summary["rear_all_contact_weak_leg_ratio"] = {
+            "RL": _safe_float(float(np.nanmean(rear_all_contact_weak_leg_index == 2.0))),
+            "RR": _safe_float(float(np.nanmean(rear_all_contact_weak_leg_index == 3.0))),
+        }
+        summary["rear_all_contact_weak_leg_index_last"] = _safe_float(
+            float(rear_all_contact_weak_leg_index[-1])
+        )
+    if applied_linear_support_force_floor_ratio.size:
+        summary["applied_linear_support_force_floor_ratio_mean"] = _safe_float(
+            float(np.nanmean(applied_linear_support_force_floor_ratio))
+        )
+        summary["applied_linear_support_force_floor_ratio_max"] = _safe_float(
+            float(np.nanmax(applied_linear_support_force_floor_ratio))
+        )
+    if applied_linear_rear_handoff_leg_index.size:
+        summary["applied_linear_rear_handoff_leg_ratio"] = {
+            "FL": _safe_float(float(np.nanmean(applied_linear_rear_handoff_leg_index == 0.0))),
+            "FR": _safe_float(float(np.nanmean(applied_linear_rear_handoff_leg_index == 1.0))),
+            "RL": _safe_float(float(np.nanmean(applied_linear_rear_handoff_leg_index == 2.0))),
+            "RR": _safe_float(float(np.nanmean(applied_linear_rear_handoff_leg_index == 3.0))),
+        }
+        summary["applied_linear_rear_handoff_leg_index_last"] = _safe_float(
+            float(applied_linear_rear_handoff_leg_index[-1])
+        )
+    if applied_linear_rear_handoff_leg_floor_scale.size:
+        summary["applied_linear_rear_handoff_leg_floor_scale_mean"] = _safe_float(
+            float(np.nanmean(applied_linear_rear_handoff_leg_floor_scale))
+        )
+        summary["applied_linear_rear_handoff_leg_floor_scale_max"] = _safe_float(
+            float(np.nanmax(applied_linear_rear_handoff_leg_floor_scale))
+        )
+    if applied_linear_latched_force_scale.size:
+        summary["applied_linear_latched_force_scale_mean"] = _safe_float(
+            float(np.nanmean(applied_linear_latched_force_scale))
+        )
+        summary["applied_linear_latched_force_scale_min"] = _safe_float(
+            float(np.nanmin(applied_linear_latched_force_scale))
+        )
+    if applied_linear_latched_front_receiver_scale.size:
+        summary["applied_linear_latched_front_receiver_scale_mean"] = _safe_float(
+            float(np.nanmean(applied_linear_latched_front_receiver_scale))
+        )
+        summary["applied_linear_latched_front_receiver_scale_min"] = _safe_float(
+            float(np.nanmin(applied_linear_latched_front_receiver_scale))
+        )
+    if applied_linear_latched_rear_receiver_scale.size:
+        summary["applied_linear_latched_rear_receiver_scale_mean"] = _safe_float(
+            float(np.nanmean(applied_linear_latched_rear_receiver_scale))
+        )
+        summary["applied_linear_latched_rear_receiver_scale_max"] = _safe_float(
+            float(np.nanmax(applied_linear_latched_rear_receiver_scale))
         )
     if rear_handoff_support_active.size:
         summary["rear_handoff_support_mean"] = _safe_float(float(np.nanmean(rear_handoff_support_active)))

@@ -315,6 +315,10 @@ linear_osqp_params = {
     'swing_contact_release_timeout_s': 0.0,  # if a planned swing leg remains physically stuck in contact, stop re-latching it forever after this timeout
     'front_swing_contact_release_timeout_s': None,  # optional front-leg override for planned-swing contact release timeout
     'rear_swing_contact_release_timeout_s': None,  # optional rear-leg override for planned-swing contact release timeout
+    'crawl_front_stuck_swing_release_timeout_s': 0.0,  # crawl-only late seam timeout for a front leg that remains planted despite planned swing
+    'crawl_front_stuck_swing_release_height_ratio': 0.0,  # only allow the crawl late front stuck-swing release while body height stays below this nominal-height ratio
+    'crawl_front_stuck_swing_release_roll_threshold': None,  # optional abs roll threshold [rad] required before the crawl late front stuck-swing release may arm
+    'crawl_front_stuck_swing_release_pitch_threshold': None,  # optional abs pitch threshold [rad] required before the crawl late front stuck-swing release may arm
     'front_release_lift_height': 0.0,  # temporary extra upward swing target [m] applied when a front swing leg remains physically stuck in contact
     'front_release_lift_kp': 0.0,  # task-space z gain used by the front forced-release lift assist
     'front_release_lift_kd': 0.0,  # task-space z damping used by the front forced-release lift assist
@@ -350,6 +354,7 @@ linear_osqp_params = {
     'rear_touchdown_contact_min_phase': 0.0,  # require rear swing phase to reach at least this value before controller-side contact may close on touchdown
     'rear_touchdown_contact_max_upward_vel': None,  # optional max allowed upward rear foot z velocity [m/s] before controller-side contact may close on touchdown
     'rear_touchdown_contact_min_grf_z': 0.0,  # require at least this upward world-frame GRF [N] before rear touchdown is treated as truly load-bearing
+    'rear_touchdown_close_lock_hold_s': 0.0,  # after a rear late touchdown closes controller-side contact, keep that close sticky for this short window while actual contact persists
     'rear_touchdown_reacquire_retire_stance_hold_s': 0.0,  # retire stale rear reacquire state once planned/current/actual stance has stayed stable this long [s]
     'rear_crawl_disable_reflex_swing': False,  # ignore early-stance reflex swing shaping on rear legs during crawl
     'front_crawl_swing_height_scale': 1.0,  # scale front-leg crawl swing vertical excursion relative to the nominal trajectory
@@ -408,19 +413,50 @@ linear_osqp_params = {
     'rear_all_contact_stabilization_height_ratio': 0.0,  # keep rear late all-contact stabilization alive while base height stays this low
     'rear_all_contact_stabilization_roll_threshold': None,  # optional abs roll threshold [rad] for keeping the rear late all-contact stabilization window alive
     'rear_all_contact_stabilization_pitch_threshold': None,  # optional abs pitch threshold [rad] for keeping the rear late all-contact stabilization window alive
+    'rear_all_contact_stabilization_preclose_pitch_threshold': None,  # optional abs pitch threshold [rad] required before the pre-close rear all-contact seam support may engage
+    'rear_all_contact_stabilization_preclose_vz_threshold': None,  # optional body vertical-velocity threshold [m/s]; seam support only engages while descending faster than this
+    'rear_late_seam_support_trigger_s': 0.0,  # optional delay [s] before a lingering rear planned-stance/current-open/all-contact seam may start rear all-contact stabilization
+    'rear_close_handoff_hold_s': 0.0,  # keep a short per-leg rear handoff window alive right after a late planned-stance/current-contact close under all-contact
+    'rear_close_handoff_leg_floor_scale_delta': 0.0,  # temporarily raise the newly-closed rear leg's vertical load floor during the rear close-handoff window
+    'rear_late_load_share_support_hold_s': 0.0,  # while crawl all-contact recovery is active, keep a short per-leg rear floor-transfer window alive on the weaker rear leg
+    'rear_late_load_share_support_min_leg_share': 0.0,  # minimum rear-pair vertical-load share expected from an individual rear leg before the late asymmetric support path arms
+    'rear_late_load_share_support_height_ratio': 0.0,  # only arm the late asymmetric rear support path while body height remains below this ratio of nominal
+    'rear_late_load_share_support_min_persist_s': 0.0,  # require the weak-leg condition to persist this long before the late asymmetric rear support path arms
+    'rear_late_load_share_support_alpha_cap': 1.0,  # cap the asymmetric late rear support alpha after persistence gating
+    'rear_late_load_share_support_leg_floor_scale_delta': 0.0,  # temporarily raise only the weaker rear leg vertical-load floor during the late asymmetric rear support path
     'rear_all_contact_stabilization_min_rear_load_share': 0.0,  # keep rear late all-contact stabilization alive while total rear vertical load share stays below this fraction
-    'rear_all_contact_stabilization_min_rear_leg_load_share': 0.0,  # keep rear late all-contact stabilization alive while the active rear leg still carries less than this vertical load-share fraction
+    'rear_all_contact_stabilization_min_rear_leg_load_share': 0.0,  # keep rear late all-contact stabilization alive while the weaker rear leg still carries less than this rear-pair load-share fraction
     'rear_all_contact_stabilization_retrigger_limit': 0,  # allow a small number of late all-contact stabilization renewals after the initial rear touchdown seam
     'rear_all_contact_stabilization_rear_floor_delta': 0.0,  # temporarily increase rear-load floor only during rear late all-contact stabilization
+    'rear_all_contact_stabilization_weak_leg_share_ref': 0.0,  # while rear late all-contact stabilization is active, treat the weaker rear leg as under-supported below this rear-pair load-share fraction
+    'rear_all_contact_stabilization_weak_leg_floor_delta': 0.0,  # temporarily raise only the weaker rear leg vertical-load floor during rear late all-contact stabilization
+    'rear_all_contact_stabilization_weak_leg_height_ratio': 0.0,  # optional extra height-ratio gate for the weaker rear leg floor boost during rear late all-contact stabilization
+    'rear_all_contact_stabilization_weak_leg_tail_only': False,  # if true, allow the weaker rear leg floor boost only during the posture-only rear all-contact tail
     'rear_all_contact_stabilization_front_anchor_z_blend': 0.0,  # blend front stance-target z toward the actual contacted foot height only during rear late all-contact stabilization
     'rear_all_contact_stabilization_rear_anchor_z_blend': 0.0,  # optional rear-leg counterpart for rear late all-contact stance-height blending
     'rear_all_contact_stabilization_front_anchor_z_max_delta': 0.0,  # cap front stance-target z at actual contacted foot z + this margin during rear late all-contact stabilization
     'rear_all_contact_stabilization_rear_anchor_z_max_delta': 0.0,  # optional rear-leg counterpart for late all-contact stance-target z capping
+    'rear_all_contact_post_recovery_tail_hold_s': 0.0,  # after full-contact recovery ends, keep a short rear-all-contact stabilization tail alive if posture is still poor
+    'rear_all_contact_release_tail_alpha_scale': 1.0,  # scale the short posture-only tail used when the rear all-contact stabilization window drops out while posture is still poor
+    'rear_all_contact_front_planted_latched_force_scale_target': 1.0,  # during the narrow crawl front-planted tail, blend relatched planned-swing-leg force scale toward this target
+    'rear_all_contact_front_planted_latched_front_receiver_scale_target': 1.0,  # during the same tail, blend released-load redistribution weight on front support legs toward this target
+    'rear_all_contact_front_planted_latched_rear_receiver_scale_target': 1.0,  # during the same tail, blend released-load redistribution weight on rear support legs toward this target
+    'rear_all_contact_front_planted_support_floor_delta': 0.0,  # during the narrow crawl front-planted tail, temporarily raise the global stance support floor
+    'rear_all_contact_front_planted_rear_floor_delta': 0.0,  # during the same tail, temporarily raise only the rear-load floor
+    'rear_all_contact_front_planted_z_pos_gain_delta': 0.0,  # during the same tail, temporarily raise base-height gain
+    'rear_all_contact_front_planted_roll_angle_gain_delta': 0.0,  # during the same tail, temporarily raise roll-angle gain
+    'rear_all_contact_front_planted_roll_rate_gain_delta': 0.0,  # during the same tail, temporarily raise roll-rate gain
+    'rear_all_contact_front_planted_side_rebalance_delta': 0.0,  # during the same tail, temporarily raise left/right support rebalance
+    'crawl_front_planted_weak_rear_share_ref': 0.0,  # during the narrow crawl front-planted seam, treat the weaker rear leg as under-supported below this rear-pair load-share fraction
+    'crawl_front_planted_weak_rear_alpha_cap': 1.0,  # cap the dedicated front-planted weak-rear support alpha
     'front_rear_transition_guard_hold_s': 0.0,  # briefly delay a front preswing when a rear touchdown seam is still unstable
     'front_rear_transition_guard_forward_scale': 1.0,  # scale forward reference velocity while the front preswing is being delayed by a rear transition seam
     'front_rear_transition_guard_roll_threshold': None,  # abs roll threshold [rad] for delaying a front preswing during a rear transition seam
     'front_rear_transition_guard_pitch_threshold': None,  # abs pitch threshold [rad] for delaying a front preswing during a rear transition seam
     'front_rear_transition_guard_height_ratio': 0.0,  # minimum base-height ratio below which a front preswing is delayed during a rear transition seam
+    'front_rear_transition_guard_release_tail_s': 0.0,  # once the rear seam is protected again, keep only a short residual front-guard tail instead of rearming the full hold
+    'front_rear_transition_guard_margin_release': 0.0,  # allow the front rear-transition guard to collapse early only after the front support margin itself has recovered above this threshold
+    'front_rear_transition_guard_post_recovery_hold_s': 0.0,  # after rear all-contact / full-contact recovery just ends, keep a short extra front preswing guard tail
     'touchdown_contact_vel_z_damping': 0.0,  # task-space vertical damping applied during touchdown support windows
     'front_touchdown_contact_vel_z_damping': None,  # optional front-leg override for touchdown vertical damping
     'rear_touchdown_contact_vel_z_damping': None,  # optional rear-leg override for touchdown vertical damping
@@ -437,6 +473,7 @@ linear_osqp_params = {
     'rear_handoff_support_hold_s': 0.0,  # keep front touchdown-style support alive briefly when a rear swing is about to start
     'rear_handoff_forward_scale': 1.0,  # scale forward reference velocity while the rear-handoff support extension is active
     'rear_handoff_lookahead_steps': 1,  # horizon steps to inspect for an upcoming rear swing before extending front touchdown support
+    'rear_handoff_support_rear_alpha_scale': 0.0,  # while rear handoff support is active and only one rear stance leg remains, blend in this much rear touchdown-support alpha
     'rear_swing_bridge_hold_s': 0.0,  # keep front touchdown-style support alive briefly into the late rear swing transition
     'rear_swing_bridge_forward_scale': 1.0,  # scale forward reference velocity while the rear-swing bridge is active
     'rear_swing_bridge_roll_threshold': None,  # abs roll threshold [rad] that can trigger the rear-swing bridge
@@ -444,6 +481,8 @@ linear_osqp_params = {
     'rear_swing_bridge_height_ratio': 0.0,  # trigger the rear-swing bridge if base height falls below this ratio of ref_z
     'rear_swing_bridge_recent_front_window_s': 0.0,  # require that front touchdown support happened within this recent time window
     'rear_swing_bridge_lookahead_steps': 1,  # horizon steps to inspect for an upcoming rear swing when bridging support
+    'rear_swing_bridge_allcontact_release_tail_s': 0.0,  # once the rear seam is closed again, cap lingering rear-swing bridge hold to this short release tail
+    'rear_swing_bridge_rear_alpha_scale': 0.0,  # while rear-swing bridge is active and only one rear stance leg remains, blend in this much rear touchdown-support alpha
     'rear_swing_release_support_hold_s': 0.0,  # keep temporary support overrides alive shortly after a rear leg is force-released into swing
     'rear_swing_release_forward_scale': 1.0,  # scale forward reference velocity while rear forced-release support is active
     'full_contact_recovery_hold_s': 0.0,  # keep touchdown-style support overrides alive for a short time once all feet are back in contact
@@ -453,8 +492,28 @@ linear_osqp_params = {
     'full_contact_recovery_height_ratio': 0.0,  # trigger late full-contact recovery when base height falls below this ratio of ref_z
     'full_contact_recovery_recent_window_s': 0.0,  # optionally require that a front touchdown support window happened recently before enabling late full-contact recovery
     'full_contact_recovery_rear_support_scale': 0.0,  # optional rear-support alpha blended in during late full-contact recovery when a rear touchdown seam was active recently
+    'full_contact_recovery_allcontact_release_tail_s': 0.0,  # once rear seam states are closed again, cap lingering full-contact recovery to this short release tail
     'crawl_front_delayed_swing_recovery_hold_s': 0.0,  # in crawl, briefly keep late full-contact recovery alive when a front leg is nominally opening swing but is still actually/load-bearing in stance
+    'crawl_front_delayed_swing_recovery_margin_threshold': 0.0,  # only extend delayed front-swing recovery while the planned-swing front leg still has at most this support margin
+    'crawl_front_delayed_swing_recovery_once_per_swing': False,  # when enabled, allow the delayed front-swing recovery extension to fire at most once per continuous front planned-swing window
+    'crawl_front_delayed_swing_recovery_release_tail_s': 0.0,  # once the planned-swing front leg has recovered support margin above the delayed-recovery threshold, cap the remaining late full-contact recovery hold to this short tail
+    'crawl_front_delayed_swing_recovery_rearm_trigger_s': 0.0,  # only re-arm delayed front-swing recovery when the remaining full-contact recovery time is at or below this threshold
+    'crawl_front_planted_swing_recovery_hold_s': 0.0,  # in crawl, when a front leg is nominally in swing but still planted near the end of full-contact recovery, re-arm a short late recovery tail
+    'crawl_front_planted_swing_recovery_margin_threshold': 0.0,  # only arm the crawl planted-front-swing recovery tail while the planted planned-swing front leg stays at or below this support margin
+    'crawl_front_planted_swing_recovery_height_ratio': 0.0,  # only arm the crawl planted-front-swing recovery tail while body height stays below this nominal-height ratio
+    'crawl_front_planted_swing_recovery_roll_threshold': None,  # optional abs roll threshold [rad] required before the crawl planted-front-swing recovery tail may arm
+    'crawl_front_planted_swing_recovery_rearm_trigger_s': 0.0,  # only re-arm the planted-front-swing recovery tail once the existing full-contact recovery hold has decayed below this remaining time
+    'crawl_front_planted_postdrop_recovery_hold_s': 0.0,  # after late full-contact recovery actually drops out, grant one extra short recovery chunk if the same planted front swing leg is still sagging
+    'crawl_front_planted_seam_support_hold_s': 0.0,  # while a front leg is planned swing but still planted immediately after full-contact recovery drops, keep a short dedicated seam-support window alive
+    'crawl_front_planted_seam_keep_swing': False,  # while that post-recovery planted-front seam window is active, keep the planted front leg on the controller swing side so lift-off continues instead of re-latching stance
     'crawl_front_stance_support_tail_hold_s': 0.0,  # in crawl, keep the remaining front stance leg on touchdown-style support briefly after the opposite front leg actually opens swing
+    'crawl_front_stance_support_tail_forward_scale': 1.0,  # scale forward reference velocity while the crawl front stance-support tail is active
+    'crawl_front_close_gap_support_hold_s': 0.0,  # in crawl, keep the front stance-support tail alive while a front leg has already re-closed planned/current stance but actual contact has not yet returned
+    'crawl_front_close_gap_keep_swing': False,  # in the same front close-gap seam, keep the returning front leg in controller-side swing until physical contact actually closes
+    'crawl_front_late_rearm_tail_hold_s': 0.0,  # in crawl, re-arm a very short front stance-support tail after the original tail has expired but the same front swing is still sagging
+    'crawl_front_late_rearm_budget_s': 0.0,  # maximum total extra late-rearm support budget that can be consumed within one continuous front planned-swing window
+    'crawl_front_late_rearm_min_swing_time_s': 0.0,  # minimum front swing elapsed time before the late crawl tail re-arm can fire
+    'crawl_front_late_rearm_min_negative_margin': 0.0,  # require the still-swinging front leg support margin to stay below -this value before the late crawl tail re-arm fires
     'pre_swing_gate_hold_s': 0.08,  # maximum extra time to delay lift-off while waiting for enough support margin
     'pre_swing_gate_forward_scale': 1.0,  # scale forward reference velocity while lift-off is delayed by the pre-swing support-margin gate
     'vx_gain': 1.6,  # proportional gain from forward velocity error to desired body force
@@ -475,9 +534,11 @@ linear_osqp_params = {
     'latched_swing_lift_ratio': 0.0,  # raise a relatched swing leg a fraction of step height to help break contact
     'latched_swing_tau_blend': 0.0,  # blend a relatched planned-swing leg toward swing-space torque during the release window
     'contact_latch_steps': 6,  # base number of contact-sequence steps a planned-swing leg may stay relatched
+    'front_contact_latch_steps': None,  # optional front-leg override for the planned-swing relatch horizon
     'rear_contact_latch_steps': None,  # optional rear-leg override for the planned-swing relatch horizon
     'contact_latch_budget_steps': 0,  # legacy controller-step budget; time-based config below takes precedence when set
     'contact_latch_budget_s': None,  # relatched-support budget in seconds; None falls back to legacy controller-step conversion
+    'front_contact_latch_budget_s': None,  # optional front-leg override for the planned-swing relatch budget in seconds
     'rear_contact_latch_budget_s': None,  # optional rear-leg override for the planned-swing relatch budget in seconds
     'startup_full_stance_steps': 15,  # legacy controller-step warmup; time-based config below takes precedence when set
     'startup_full_stance_time_s': None,  # full-stance warmup in seconds; None falls back to legacy controller-step conversion

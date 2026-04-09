@@ -16,7 +16,8 @@ stack from scratch, but to:
 The main remaining bottlenecks are now:
 
 1. `crawl`: late rear load transfer / post-touchdown stabilization, after the
-   earlier rear recontact seam was narrowed down.
+   earlier rear recontact seam was narrowed down and the weak-leg late-support
+   path was split out from the broader rear close-handoff path.
 2. `trot`: motion quality in dynamic scenarios, especially pitch bias and
    forward-tracking quality relative to the stock sampling baseline.
 
@@ -79,17 +80,25 @@ The main remaining bottlenecks are now:
   `linear_osqp` mean yaw rate from roughly `0.065` to `0.270 rad/s` without
   breaking the straight or disturbance checks. The current short-horizon
   benchmark bundle is `outputs/report_progress_explainer/trot_benchmark_suite_20260408_yawref/`.
-- The current conservative `crawl` default now reaches roughly the 8.8-second
-  mark in a 10-second stress test before failure. The most recent improvement
-  came from treating the late rear all-contact seam more locally: during the
-  rear late all-contact stabilization window, the front touchdown-support alpha
-  is reduced while a temporary rear-load floor bias is applied. The currently
-  promoted default uses `rear_all_contact_stabilization_rear_floor_delta = 0.50`
-  after a narrow refinement around the earlier `0.45` default.
+- The current promoted `crawl` path first improved the late seam with the
+  front-tail recovery pair and the `rear_close_handoff_hold_s = 0.14`
+  targeted re-close support.
+- The most recent `crawl` follow-up then separated the late weak-leg rear-load
+  support from that broader close-handoff path instead of renewing the same
+  timer. The promoted crawl preset now keeps:
+  - `rear_late_load_share_support_hold_s = 0.18`
+  - `rear_late_load_share_support_leg_floor_scale_delta = 0.10`
+  as a dedicated weaker-rear-leg floor boost during the final low-height
+  all-contact seam.
+- With that dedicated path, the current long-horizon crawl default reaches
+  roughly `13.76 s` in the 20-second stress check before failure, slightly
+  beyond the previous `13.75 s` close-handoff baseline, while preserving the
+  same late `RL_thigh`-type failure mode instead of regressing into the earlier
+  front-hip failure.
 - The remaining `crawl` failure should now be read as a late-horizon
   stabilization problem rather than an early rear recontact failure. The robot
   still settles into a low all-contact posture and eventually drifts into a
-  rear-hip invalid contact.
+  late rear invalid contact after the weak-leg load share collapses again.
 - The main remaining gap is now more about stock-level tracking quality and
   long-horizon contact-transition robustness than basic viability: `trot`
   remains usable across the current straight / turn / disturbance checks, while
@@ -222,9 +231,9 @@ comparisons do not depend on ad-hoc commands or mixed horizons.
 
 Latest locally validated outputs:
 
+- `outputs/curated_runs/crawl_current_lateloadshare_dedicated_default_20s/`
+- `outputs/curated_runs/crawl_current_closehandoff014_default_20s/`
 - `outputs/curated_runs/crawl_fronttail010_default_10s/`
-- `outputs/curated_runs/crawl_rearallcontact_rearfloor_default_10s/`
-- `outputs/curated_runs/crawl_rearallcontact_rearfloor045_default_10s/`
 - `outputs/curated_runs/trot_current_turn_default_10s/`
 - `outputs/curated_runs/trot_current_disturb_default_10s/`
 - `outputs/curated_runs/trot_current_straight_default_20s/`

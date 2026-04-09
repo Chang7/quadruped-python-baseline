@@ -120,6 +120,8 @@ class WBInterface:
         self.contact_latch_steps = 6
         self.startup_full_stance_time_s = 0.0
         self.contact_latch_budget_s = 0.0
+        self.front_contact_latch_steps = 6
+        self.front_contact_latch_budget_s = 0.0
         self.rear_contact_latch_steps = 6
         self.rear_contact_latch_budget_s = 0.0
         self.virtual_unlatch_hold_s = 0.0
@@ -180,6 +182,7 @@ class WBInterface:
         self.rear_touchdown_contact_min_phase = 0.0
         self.rear_touchdown_contact_max_upward_vel = np.inf
         self.rear_touchdown_contact_min_grf_z = 0.0
+        self.rear_touchdown_close_lock_hold_s = 0.0
         self.rear_crawl_disable_reflex_swing = False
         self.front_crawl_swing_height_scale = 1.0
         self.rear_crawl_swing_height_scale = 1.0
@@ -210,6 +213,9 @@ class WBInterface:
         self.front_rear_transition_guard_roll_threshold = np.inf
         self.front_rear_transition_guard_pitch_threshold = np.inf
         self.front_rear_transition_guard_height_ratio = 0.0
+        self.front_rear_transition_guard_release_tail_s = 0.0
+        self.front_rear_transition_guard_margin_release = 0.0
+        self.front_rear_transition_guard_post_recovery_hold_s = 0.0
         self.rear_pre_swing_guard_roll_threshold = np.inf
         self.rear_pre_swing_guard_pitch_threshold = np.inf
         self.rear_pre_swing_guard_height_ratio = 0.0
@@ -231,7 +237,26 @@ class WBInterface:
         self.full_contact_recovery_recent_window_s = 0.0
         self.full_contact_recovery_rear_support_scale = 0.0
         self.crawl_front_delayed_swing_recovery_hold_s = 0.0
+        self.crawl_front_delayed_swing_recovery_margin_threshold = 0.0
+        self.crawl_front_delayed_swing_recovery_once_per_swing = False
+        self.crawl_front_delayed_swing_recovery_release_tail_s = 0.0
+        self.crawl_front_delayed_swing_recovery_rearm_trigger_s = 0.0
+        self.crawl_front_planted_swing_recovery_hold_s = 0.0
+        self.crawl_front_planted_swing_recovery_margin_threshold = 0.0
+        self.crawl_front_planted_swing_recovery_height_ratio = 0.0
+        self.crawl_front_planted_swing_recovery_roll_threshold = None
+        self.crawl_front_planted_swing_recovery_rearm_trigger_s = 0.0
+        self.crawl_front_planted_postdrop_recovery_hold_s = 0.0
+        self.crawl_front_planted_seam_support_hold_s = 0.0
+        self.crawl_front_planted_seam_keep_swing = False
         self.crawl_front_stance_support_tail_hold_s = 0.0
+        self.crawl_front_stance_support_tail_forward_scale = 1.0
+        self.crawl_front_close_gap_support_hold_s = 0.0
+        self.crawl_front_close_gap_keep_swing = False
+        self.crawl_front_late_rearm_tail_hold_s = 0.0
+        self.crawl_front_late_rearm_budget_s = 0.0
+        self.crawl_front_late_rearm_min_swing_time_s = 0.0
+        self.crawl_front_late_rearm_min_negative_margin = 0.0
         self.pre_swing_gate_hold_s = 0.0
         self.startup_full_stance_elapsed_s = 0.0
         self.contact_latch_elapsed_s = np.zeros(4, dtype=float)
@@ -244,6 +269,12 @@ class WBInterface:
         self.touchdown_confirm_elapsed_s = np.zeros(4, dtype=float)
         self.touchdown_settle_remaining_s = np.zeros(4, dtype=float)
         self.rear_touchdown_actual_contact_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_late_seam_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_close_handoff_remaining_s = np.zeros(4, dtype=float)
+        self.rear_close_handoff_alpha_scale = np.zeros(4, dtype=float)
+        self.rear_late_load_share_remaining_s = np.zeros(4, dtype=float)
+        self.rear_late_load_share_trigger_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_touchdown_close_lock_remaining_s = np.zeros(4, dtype=float)
         self.rear_touchdown_retry_count = np.zeros(4, dtype=int)
         self.rear_stable_stance_elapsed_s = np.zeros(4, dtype=float)
         self.previous_feet_pos_world = np.zeros((4, 3), dtype=float)
@@ -261,6 +292,15 @@ class WBInterface:
         self.rear_swing_release_support_active = 0
         self.full_contact_recovery_remaining_s = 0.0
         self.crawl_front_stance_support_tail_remaining_s = 0.0
+        self.crawl_front_planted_seam_support_remaining_s = 0.0
+        self.front_rear_transition_guard_post_recovery_remaining_s = 0.0
+        self.rear_all_contact_post_recovery_remaining_s = 0.0
+        self.rear_all_contact_post_recovery_alpha_scale = 1.0
+        self.rear_all_contact_front_planted_tail_remaining_s = 0.0
+        self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
+        self.front_delayed_swing_recovery_spent = np.zeros(2, dtype=int)
+        self.front_planted_swing_recovery_spent = np.zeros(2, dtype=int)
+        self.front_late_rearm_used_s = np.zeros(2, dtype=float)
         self.front_stance_dropout_support_remaining_s = np.zeros(2, dtype=float)
         self.front_touchdown_support_recent_remaining_s = 0.0
         self.rear_swing_bridge_recent_front_remaining_s = 0.0
@@ -275,13 +315,52 @@ class WBInterface:
         self.touchdown_settle_active = np.zeros(4, dtype=int)
         self.touchdown_support_active = np.zeros(4, dtype=int)
         self.rear_touchdown_pending_confirm = np.zeros(4, dtype=int)
+        self.rear_retry_contact_signal_debug = np.zeros(4, dtype=int)
+        self.rear_touchdown_contact_ready_debug = np.zeros(4, dtype=int)
+        self.rear_late_stance_contact_ready_debug = np.zeros(4, dtype=int)
+        self.rear_all_contact_support_needed_debug = np.zeros(4, dtype=int)
+        self.rear_late_seam_support_active_debug = np.zeros(4, dtype=int)
+        self.rear_close_handoff_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_alpha_debug = np.zeros(4, dtype=float)
+        self.rear_late_load_share_candidate_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_candidate_alpha_debug = np.zeros(4, dtype=float)
+        self.rear_late_load_share_trigger_enabled_debug = 0
+        self.full_contact_recovery_trigger_debug = 0
+        self.front_delayed_swing_recovery_trigger_debug = 0
+        self.planted_front_recovery_trigger_debug = 0
+        self.planted_front_postdrop_recovery_trigger_debug = 0
+        self.front_close_gap_trigger_debug = 0
+        self.front_late_rearm_trigger_debug = 0
+        self.front_planted_posture_tail_trigger_debug = 0
+        self.front_late_posture_tail_trigger_debug = 0
         self.front_margin_rescue_active = np.zeros(4, dtype=int)
         self.touchdown_support_alpha = 0.0
         self.front_touchdown_support_alpha = 0.0
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
+        self.rear_all_contact_front_planted_tail_alpha = 0.0
+        self.crawl_front_planted_seam_support_alpha = 0.0
+        self.rear_all_contact_weak_leg_alpha = 0.0
+        self.rear_all_contact_weak_leg_index = -1
+        self.rear_close_handoff_alpha = 0.0
+        self.rear_close_handoff_leg_index = -1
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
         self.rear_all_contact_stabilization_min_rear_leg_load_share = 0.0
+        self.rear_all_contact_stabilization_weak_leg_share_ref = 0.0
+        self.rear_all_contact_stabilization_weak_leg_height_ratio = 0.0
+        self.rear_all_contact_stabilization_weak_leg_tail_only = False
         self.rear_all_contact_stabilization_retrigger_limit = 0
+        self.rear_all_contact_post_recovery_tail_hold_s = 0.0
+        self.rear_all_contact_release_tail_alpha_scale = 1.0
+        self.rear_late_seam_support_trigger_s = 0.0
+        self.rear_close_handoff_hold_s = 0.0
+        self.rear_late_load_share_support_hold_s = 0.0
+        self.rear_late_load_share_support_min_leg_share = 0.0
+        self.rear_late_load_share_support_height_ratio = 0.0
+        self.rear_late_load_share_support_min_persist_s = 0.0
+        self.rear_late_load_share_support_alpha_cap = 1.0
         self.touchdown_contact_vel_z_damping = 0.0
         self.front_touchdown_contact_vel_z_damping = 0.0
         self.rear_touchdown_contact_vel_z_damping = 0.0
@@ -331,6 +410,16 @@ class WBInterface:
         self.contact_latch_budget_s = self._resolve_duration_seconds(
             params, 'contact_latch_budget_s', 'contact_latch_budget_steps', step_dt=self.mpc_dt
         )
+        front_contact_latch_steps = params.get('front_contact_latch_steps', None)
+        self.front_contact_latch_steps = max(
+            int(self.contact_latch_steps if front_contact_latch_steps is None else front_contact_latch_steps),
+            0,
+        )
+        front_contact_latch_budget_s = params.get('front_contact_latch_budget_s', None)
+        self.front_contact_latch_budget_s = max(
+            float(self.contact_latch_budget_s if front_contact_latch_budget_s is None else front_contact_latch_budget_s),
+            0.0,
+        )
         rear_contact_latch_steps = params.get('rear_contact_latch_steps', None)
         self.rear_contact_latch_steps = max(
             int(self.contact_latch_steps if rear_contact_latch_steps is None else rear_contact_latch_steps),
@@ -347,13 +436,14 @@ class WBInterface:
         self.pre_swing_gate_min_margin = max(float(params.get('pre_swing_gate_min_margin', 0.0)), 0.0)
         front_margin = params.get('front_pre_swing_gate_min_margin', None)
         rear_margin = params.get('rear_pre_swing_gate_min_margin', None)
-        self.front_pre_swing_gate_min_margin = max(
-            float(self.pre_swing_gate_min_margin if front_margin is None else front_margin),
-            0.0,
+        # Allow per-leg overrides to go slightly negative for targeted diagnostics.
+        # The shared/base margin remains nonnegative by default, so unchanged presets
+        # behave exactly as before unless an explicit override is provided.
+        self.front_pre_swing_gate_min_margin = float(
+            self.pre_swing_gate_min_margin if front_margin is None else front_margin
         )
-        self.rear_pre_swing_gate_min_margin = max(
-            float(self.pre_swing_gate_min_margin if rear_margin is None else rear_margin),
-            0.0,
+        self.rear_pre_swing_gate_min_margin = float(
+            self.pre_swing_gate_min_margin if rear_margin is None else rear_margin
         )
         self.swing_contact_release_timeout_s = max(float(params.get('swing_contact_release_timeout_s', 0.0)), 0.0)
         front_release_timeout = params.get('front_swing_contact_release_timeout_s', None)
@@ -365,6 +455,22 @@ class WBInterface:
         self.rear_swing_contact_release_timeout_s = max(
             float(self.swing_contact_release_timeout_s if rear_release_timeout is None else rear_release_timeout),
             0.0,
+        )
+        self.crawl_front_stuck_swing_release_timeout_s = max(
+            float(params.get('crawl_front_stuck_swing_release_timeout_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_stuck_swing_release_height_ratio = max(
+            float(params.get('crawl_front_stuck_swing_release_height_ratio', 0.0)),
+            0.0,
+        )
+        crawl_front_stuck_roll = params.get('crawl_front_stuck_swing_release_roll_threshold', None)
+        self.crawl_front_stuck_swing_release_roll_threshold = (
+            np.inf if crawl_front_stuck_roll is None else float(max(crawl_front_stuck_roll, 0.0))
+        )
+        crawl_front_stuck_pitch = params.get('crawl_front_stuck_swing_release_pitch_threshold', None)
+        self.crawl_front_stuck_swing_release_pitch_threshold = (
+            np.inf if crawl_front_stuck_pitch is None else float(max(crawl_front_stuck_pitch, 0.0))
         )
         self.front_release_lift_height = max(float(params.get('front_release_lift_height', 0.0)), 0.0)
         self.front_release_lift_kp = max(float(params.get('front_release_lift_kp', 0.0)), 0.0)
@@ -538,6 +644,10 @@ class WBInterface:
             float(params.get('rear_touchdown_contact_min_grf_z', 0.0)),
             0.0,
         )
+        self.rear_touchdown_close_lock_hold_s = max(
+            float(params.get('rear_touchdown_close_lock_hold_s', 0.0)),
+            0.0,
+        )
         self.rear_touchdown_reacquire_retire_stance_hold_s = max(
             float(params.get('rear_touchdown_reacquire_retire_stance_hold_s', 0.0)),
             0.0,
@@ -668,6 +778,18 @@ class WBInterface:
             float(params.get('front_rear_transition_guard_height_ratio', 0.0)),
             0.0,
         )
+        self.front_rear_transition_guard_release_tail_s = max(
+            float(params.get('front_rear_transition_guard_release_tail_s', 0.0)),
+            0.0,
+        )
+        self.front_rear_transition_guard_margin_release = max(
+            float(params.get('front_rear_transition_guard_margin_release', 0.0)),
+            0.0,
+        )
+        self.front_rear_transition_guard_post_recovery_hold_s = max(
+            float(params.get('front_rear_transition_guard_post_recovery_hold_s', 0.0)),
+            0.0,
+        )
         self.touchdown_contact_vel_z_damping = max(float(params.get('touchdown_contact_vel_z_damping', 0.0)), 0.0)
         front_touchdown_contact_vel_z_damping = params.get('front_touchdown_contact_vel_z_damping', None)
         rear_touchdown_contact_vel_z_damping = params.get('rear_touchdown_contact_vel_z_damping', None)
@@ -713,9 +835,15 @@ class WBInterface:
             np.clip(params.get('rear_handoff_forward_scale', 1.0), 0.0, 1.0)
         )
         self.rear_handoff_lookahead_steps = max(int(params.get('rear_handoff_lookahead_steps', 1)), 1)
+        self.rear_handoff_support_rear_alpha_scale = float(
+            np.clip(params.get('rear_handoff_support_rear_alpha_scale', 0.0), 0.0, 1.0)
+        )
         self.rear_swing_bridge_hold_s = max(float(params.get('rear_swing_bridge_hold_s', 0.0)), 0.0)
         self.rear_swing_bridge_forward_scale = float(
             np.clip(params.get('rear_swing_bridge_forward_scale', 1.0), 0.0, 1.0)
+        )
+        self.rear_swing_bridge_rear_alpha_scale = float(
+            np.clip(params.get('rear_swing_bridge_rear_alpha_scale', 0.0), 0.0, 1.0)
         )
         self.rear_swing_release_support_hold_s = max(
             float(params.get('rear_swing_release_support_hold_s', 0.0)),
@@ -738,6 +866,10 @@ class WBInterface:
             0.0,
         )
         self.rear_swing_bridge_lookahead_steps = max(int(params.get('rear_swing_bridge_lookahead_steps', 1)), 1)
+        self.rear_swing_bridge_allcontact_release_tail_s = max(
+            float(params.get('rear_swing_bridge_allcontact_release_tail_s', 0.0)),
+            0.0,
+        )
         rear_pre_swing_guard_roll = params.get('rear_pre_swing_guard_roll_threshold', None)
         rear_pre_swing_guard_pitch = params.get('rear_pre_swing_guard_pitch_threshold', None)
         self.rear_pre_swing_guard_roll_threshold = (
@@ -773,12 +905,86 @@ class WBInterface:
         self.full_contact_recovery_rear_support_scale = float(
             np.clip(params.get('full_contact_recovery_rear_support_scale', 0.0), 0.0, 1.0)
         )
+        self.full_contact_recovery_allcontact_release_tail_s = max(
+            float(params.get('full_contact_recovery_allcontact_release_tail_s', 0.0)),
+            0.0,
+        )
         self.crawl_front_delayed_swing_recovery_hold_s = max(
             float(params.get('crawl_front_delayed_swing_recovery_hold_s', 0.0)),
             0.0,
         )
+        self.crawl_front_delayed_swing_recovery_margin_threshold = float(
+            params.get('crawl_front_delayed_swing_recovery_margin_threshold', 0.0)
+        )
+        self.crawl_front_delayed_swing_recovery_once_per_swing = bool(
+            params.get('crawl_front_delayed_swing_recovery_once_per_swing', False)
+        )
+        self.crawl_front_delayed_swing_recovery_release_tail_s = max(
+            float(params.get('crawl_front_delayed_swing_recovery_release_tail_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_delayed_swing_recovery_rearm_trigger_s = max(
+            float(params.get('crawl_front_delayed_swing_recovery_rearm_trigger_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_swing_recovery_hold_s = max(
+            float(params.get('crawl_front_planted_swing_recovery_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_swing_recovery_margin_threshold = float(
+            params.get('crawl_front_planted_swing_recovery_margin_threshold', 0.0)
+        )
+        self.crawl_front_planted_swing_recovery_height_ratio = max(
+            float(params.get('crawl_front_planted_swing_recovery_height_ratio', 0.0)),
+            0.0,
+        )
+        crawl_front_planted_roll = params.get('crawl_front_planted_swing_recovery_roll_threshold', None)
+        self.crawl_front_planted_swing_recovery_roll_threshold = (
+            None if crawl_front_planted_roll is None else max(float(crawl_front_planted_roll), 0.0)
+        )
+        self.crawl_front_planted_swing_recovery_rearm_trigger_s = max(
+            float(params.get('crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_postdrop_recovery_hold_s = max(
+            float(params.get('crawl_front_planted_postdrop_recovery_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_seam_support_hold_s = max(
+            float(params.get('crawl_front_planted_seam_support_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_seam_keep_swing = bool(
+            params.get('crawl_front_planted_seam_keep_swing', False)
+        )
         self.crawl_front_stance_support_tail_hold_s = max(
             float(params.get('crawl_front_stance_support_tail_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_stance_support_tail_forward_scale = float(
+            np.clip(params.get('crawl_front_stance_support_tail_forward_scale', 1.0), 0.0, 1.0)
+        )
+        self.crawl_front_close_gap_support_hold_s = max(
+            float(params.get('crawl_front_close_gap_support_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_close_gap_keep_swing = bool(
+            params.get('crawl_front_close_gap_keep_swing', False)
+        )
+        self.crawl_front_late_rearm_tail_hold_s = max(
+            float(params.get('crawl_front_late_rearm_tail_hold_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_late_rearm_budget_s = max(
+            float(params.get('crawl_front_late_rearm_budget_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_late_rearm_min_swing_time_s = max(
+            float(params.get('crawl_front_late_rearm_min_swing_time_s', 0.0)),
+            0.0,
+        )
+        self.crawl_front_late_rearm_min_negative_margin = max(
+            float(params.get('crawl_front_late_rearm_min_negative_margin', 0.0)),
             0.0,
         )
         self.rear_all_contact_stabilization_hold_s = max(
@@ -797,11 +1003,54 @@ class WBInterface:
         )
         rear_all_contact_roll = params.get('rear_all_contact_stabilization_roll_threshold', None)
         rear_all_contact_pitch = params.get('rear_all_contact_stabilization_pitch_threshold', None)
+        rear_all_contact_preclose_pitch = params.get('rear_all_contact_stabilization_preclose_pitch_threshold', None)
+        rear_all_contact_preclose_vz = params.get('rear_all_contact_stabilization_preclose_vz_threshold', None)
         self.rear_all_contact_stabilization_roll_threshold = (
             np.inf if rear_all_contact_roll is None else max(float(rear_all_contact_roll), 0.0)
         )
         self.rear_all_contact_stabilization_pitch_threshold = (
             np.inf if rear_all_contact_pitch is None else max(float(rear_all_contact_pitch), 0.0)
+        )
+        self.rear_all_contact_stabilization_preclose_pitch_threshold = (
+            np.inf
+            if rear_all_contact_preclose_pitch is None
+            else max(float(rear_all_contact_preclose_pitch), 0.0)
+        )
+        self.rear_all_contact_stabilization_preclose_vz_threshold = (
+            -np.inf
+            if rear_all_contact_preclose_vz is None
+            else float(rear_all_contact_preclose_vz)
+        )
+        self.rear_late_seam_support_trigger_s = max(
+            float(params.get('rear_late_seam_support_trigger_s', 0.0)),
+            0.0,
+        )
+        self.rear_close_handoff_hold_s = max(
+            float(params.get('rear_close_handoff_hold_s', 0.0)),
+            0.0,
+        )
+        self.rear_late_load_share_support_hold_s = max(
+            float(params.get('rear_late_load_share_support_hold_s', 0.0)),
+            0.0,
+        )
+        self.rear_late_load_share_support_min_leg_share = max(
+            float(params.get('rear_late_load_share_support_min_leg_share', 0.0)),
+            0.0,
+        )
+        self.rear_late_load_share_support_height_ratio = max(
+            float(params.get('rear_late_load_share_support_height_ratio', 0.0)),
+            0.0,
+        )
+        self.rear_late_load_share_support_min_persist_s = max(
+            float(params.get('rear_late_load_share_support_min_persist_s', 0.0)),
+            0.0,
+        )
+        self.rear_late_load_share_support_alpha_cap = float(
+            np.clip(
+                float(params.get('rear_late_load_share_support_alpha_cap', 1.0)),
+                0.0,
+                1.0,
+            )
         )
         self.rear_all_contact_stabilization_min_rear_load_share = max(
             float(params.get('rear_all_contact_stabilization_min_rear_load_share', 0.0)),
@@ -811,9 +1060,49 @@ class WBInterface:
             float(params.get('rear_all_contact_stabilization_min_rear_leg_load_share', 0.0)),
             0.0,
         )
+        self.rear_all_contact_stabilization_weak_leg_share_ref = max(
+            float(params.get('rear_all_contact_stabilization_weak_leg_share_ref', 0.0)),
+            0.0,
+        )
+        self.rear_all_contact_stabilization_weak_leg_height_ratio = max(
+            float(params.get('rear_all_contact_stabilization_weak_leg_height_ratio', 0.0)),
+            0.0,
+        )
+        self.rear_all_contact_stabilization_weak_leg_tail_only = bool(
+            params.get('rear_all_contact_stabilization_weak_leg_tail_only', False)
+        )
         self.rear_all_contact_stabilization_retrigger_limit = max(
             int(params.get('rear_all_contact_stabilization_retrigger_limit', 0)),
             0,
+        )
+        self.rear_all_contact_post_recovery_tail_hold_s = max(
+            float(params.get('rear_all_contact_post_recovery_tail_hold_s', 0.0)),
+            0.0,
+        )
+        self.rear_all_contact_release_tail_alpha_scale = float(
+            np.clip(
+                params.get('rear_all_contact_release_tail_alpha_scale', 1.0),
+                0.0,
+                1.0,
+            )
+        )
+        self.rear_all_contact_post_recovery_front_late_alpha_scale = float(
+            np.clip(
+                params.get('rear_all_contact_post_recovery_front_late_alpha_scale', 1.0),
+                0.0,
+                1.0,
+            )
+        )
+        self.crawl_front_planted_weak_rear_share_ref = max(
+            float(params.get('crawl_front_planted_weak_rear_share_ref', 0.0)),
+            0.0,
+        )
+        self.crawl_front_planted_weak_rear_alpha_cap = float(
+            np.clip(
+                params.get('crawl_front_planted_weak_rear_alpha_cap', 1.0),
+                0.0,
+                1.0,
+            )
         )
         self.pre_swing_gate_hold_s = max(float(params.get('pre_swing_gate_hold_s', 0.0)), 0.0)
         rear_pre_swing_gate_hold_s = params.get('rear_pre_swing_gate_hold_s', None)
@@ -827,6 +1116,8 @@ class WBInterface:
         if getattr(self, 'is_dynamic_gait', False):
             self.contact_latch_steps = 0
             self.contact_latch_budget_s = 0.0
+            self.front_contact_latch_steps = 0
+            self.front_contact_latch_budget_s = 0.0
             self.rear_contact_latch_steps = 0
             self.rear_contact_latch_budget_s = 0.0
             self.virtual_unlatch_hold_s = 0.0
@@ -927,6 +1218,7 @@ class WBInterface:
             front_transition_guard_roll_threshold=self.front_rear_transition_guard_roll_threshold,
             front_transition_guard_pitch_threshold=self.front_rear_transition_guard_pitch_threshold,
             front_transition_guard_height_ratio=self.front_rear_transition_guard_height_ratio,
+            front_transition_guard_release_tail_s=self.front_rear_transition_guard_release_tail_s,
             pre_swing_guard_roll_threshold=self.rear_pre_swing_guard_roll_threshold,
             pre_swing_guard_pitch_threshold=self.rear_pre_swing_guard_pitch_threshold,
             pre_swing_guard_height_ratio=self.rear_pre_swing_guard_height_ratio,
@@ -974,6 +1266,17 @@ class WBInterface:
             if float(self.rear_stable_stance_elapsed_s[leg_id]) < hold_s:
                 continue
             self._clear_touchdown_reacquire_state(leg_id, clear_retry_count=True)
+
+    def _arm_rear_touchdown_close_lock(self, leg_id: int) -> None:
+        if int(leg_id) < 2:
+            return
+        hold_s = float(self.rear_touchdown_close_lock_hold_s)
+        if hold_s <= 1e-9:
+            return
+        self.rear_touchdown_close_lock_remaining_s[leg_id] = max(
+            float(self.rear_touchdown_close_lock_remaining_s[leg_id]),
+            hold_s,
+        )
 
     def _pre_swing_gate_required_margin(self, leg_id: int) -> float:
         if int(leg_id) < 2:
@@ -1084,6 +1387,26 @@ class WBInterface:
             current_foot_vz=current_foot_vz,
             foot_grf_world=foot_grf_world,
         )
+
+    def _rear_waiting_for_recontact(
+        self,
+        leg_id: int,
+        *,
+        planned_stance: bool | None = None,
+        actual_contact: np.ndarray | None = None,
+        prev_reacquire_active: np.ndarray | None = None,
+    ) -> bool:
+        leg_id = int(leg_id)
+        if leg_id < 2:
+            return bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+
+        waiting = bool(
+            int(self.touchdown_reacquire_armed[leg_id]) == 1
+            or int(self.rear_touchdown_retry_count[leg_id]) > 0
+        )
+        if prev_reacquire_active is not None:
+            waiting = waiting or bool(int(prev_reacquire_active[leg_id]) == 1)
+        return waiting
 
     def _touchdown_contact_vel_z_damping_for_leg(self, leg_id: int) -> float:
         if int(leg_id) < 2:
@@ -1215,12 +1538,12 @@ class WBInterface:
 
     def _contact_latch_steps_for_leg(self, leg_id: int, base_latch_steps: int) -> int:
         if int(leg_id) < 2:
-            return max(int(base_latch_steps), 0)
+            return max(int(self.front_contact_latch_steps), 0)
         return max(int(self.rear_contact_latch_steps), 0)
 
     def _contact_latch_budget_s_for_leg(self, leg_id: int, base_budget_s: float) -> float:
         if int(leg_id) < 2:
-            return float(base_budget_s)
+            return float(self.front_contact_latch_budget_s)
         return float(self.rear_contact_latch_budget_s)
 
     def _foot_contact_from_mujoco(self, mujoco_contact) -> np.ndarray:
@@ -1650,6 +1973,10 @@ class WBInterface:
                 [contact_sequence[0][0], contact_sequence[1][0], contact_sequence[2][0], contact_sequence[3][0]]
             )
         actual_contact = self._foot_contact_from_mujoco(mujoco_contact)
+        transition_contact = self._resolve_actual_contact(
+            mujoco_contact=mujoco_contact,
+            foot_contact_state=foot_contact_state,
+        )
         self._retire_rear_reacquire_after_stable_stance(actual_contact, simulation_dt)
         prev_touchdown_reacquire_active = np.asarray(self.touchdown_reacquire_active, dtype=int).copy()
         prev_touchdown_confirm_active = np.asarray(self.touchdown_confirm_active, dtype=int).copy()
@@ -1659,6 +1986,7 @@ class WBInterface:
         prev_rear_swing_bridge_active = bool(int(self.rear_swing_bridge_active) == 1)
         prev_rear_swing_release_support_active = bool(int(self.rear_swing_release_support_active) == 1)
         prev_full_contact_recovery_active = bool(int(self.full_contact_recovery_active) == 1)
+        prev_rear_all_contact_alpha = float(getattr(self, 'rear_all_contact_stabilization_alpha', 0.0))
         rear_transition_recovery_context_active = bool(
             prev_full_contact_recovery_active
             or prev_rear_handoff_support_active
@@ -1669,20 +1997,29 @@ class WBInterface:
             or np.any(np.asarray(prev_touchdown_settle_active[2:4], dtype=int) == 1)
             or np.any(np.asarray(prev_touchdown_support_active[2:4], dtype=int) == 1)
         )
+        # Front pre-swing guarding should react to the rear transition seam itself,
+        # not to the broader late recovery state after that seam has already closed.
+        # Keeping the front guard tied to full-contact recovery made FL/FR planned
+        # swing windows stay virtually closed for too long in crawl.
+        front_guard_post_recovery_active = bool(
+            float(getattr(self, 'front_rear_transition_guard_post_recovery_remaining_s', 0.0)) > 1e-9
+        )
+        front_guard_rear_transition_context_active = bool(
+            prev_rear_handoff_support_active
+            or prev_rear_swing_bridge_active
+            or prev_rear_swing_release_support_active
+            or np.any(np.asarray(self.current_contact[2:4], dtype=int) == 0)
+            or np.any(np.asarray(prev_touchdown_reacquire_active[2:4], dtype=int) == 1)
+            or np.any(np.asarray(prev_touchdown_confirm_active[2:4], dtype=int) == 1)
+            or np.any(np.asarray(prev_touchdown_settle_active[2:4], dtype=int) == 1)
+            or np.any(np.asarray(prev_touchdown_support_active[2:4], dtype=int) == 1)
+            or front_guard_post_recovery_active
+        )
         rear_touchdown_contact_signal = self._resolve_actual_contact(
             mujoco_contact=mujoco_contact,
             foot_contact_state=foot_contact_state,
         )
         foot_grf_world = self._foot_grf_from_signal(foot_grf_state)
-        rear_retry_contact_signal = np.asarray(actual_contact, dtype=int).copy()
-        for leg_id in range(2, 4):
-            waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
-            if (
-                int(self.rear_touchdown_retry_count[leg_id]) > 0
-                or waiting_for_recontact
-                or int(prev_touchdown_reacquire_active[leg_id]) == 1
-            ):
-                rear_retry_contact_signal[leg_id] = int(rear_touchdown_contact_signal[leg_id])
         feet_pos_array = np.stack(
             [np.asarray(feet_pos[leg_name], dtype=float).reshape(3) for leg_name in self.legs_order],
             axis=0,
@@ -1691,6 +2028,47 @@ class WBInterface:
             approx_feet_vel_world = (feet_pos_array - self.previous_feet_pos_world) / float(simulation_dt)
         else:
             approx_feet_vel_world = np.zeros((4, 3), dtype=float)
+        rear_touchdown_contact_signal = np.asarray(rear_touchdown_contact_signal, dtype=int).copy()
+        for leg_id in range(2, 4):
+            waiting_for_recontact = self._rear_waiting_for_recontact(
+                leg_id,
+                prev_reacquire_active=prev_touchdown_reacquire_active,
+            )
+            if not (
+                int(self.rear_touchdown_retry_count[leg_id]) > 0
+                or waiting_for_recontact
+                or int(prev_touchdown_reacquire_active[leg_id]) == 1
+            ):
+                continue
+            if int(rear_touchdown_contact_signal[leg_id]) == 1 or not bool(actual_contact[leg_id]):
+                continue
+            if float(approx_feet_vel_world[leg_id, 2]) > float(self.rear_touchdown_contact_max_upward_vel):
+                continue
+            if foot_grf_world is not None:
+                try:
+                    vertical_grf = max(float(foot_grf_world[leg_id, 2]), 0.0)
+                except Exception:
+                    vertical_grf = 0.0
+                required_grf = max(float(self.rear_touchdown_contact_min_grf_z) - 0.5, 0.0)
+                if vertical_grf + 1e-12 < required_grf:
+                    continue
+            # In the late crawl seam, the external contact signal can stay low
+            # even after MuJoCo already reports a clearly load-bearing rear foot.
+            # Fuse that strong actual-contact evidence back into the retry path
+            # so the rear leg is not kept artificially in recontact mode.
+            rear_touchdown_contact_signal[leg_id] = 1
+        rear_retry_contact_signal = np.asarray(actual_contact, dtype=int).copy()
+        for leg_id in range(2, 4):
+            waiting_for_recontact = self._rear_waiting_for_recontact(
+                leg_id,
+                prev_reacquire_active=prev_touchdown_reacquire_active,
+            )
+            if (
+                int(self.rear_touchdown_retry_count[leg_id]) > 0
+                or waiting_for_recontact
+                or int(prev_touchdown_reacquire_active[leg_id]) == 1
+            ):
+                rear_retry_contact_signal[leg_id] = int(rear_touchdown_contact_signal[leg_id])
         self.last_support_margin[:] = np.nan
         self.last_support_margin_query_xy[:] = np.nan
         self.front_late_release_active[:] = 0
@@ -1701,10 +2079,37 @@ class WBInterface:
         self.touchdown_confirm_active[:] = 0
         self.touchdown_settle_active[:] = 0
         self.touchdown_support_active[:] = 0
+        self.rear_retry_contact_signal_debug[:] = 0
+        self.rear_touchdown_contact_ready_debug[:] = 0
+        self.rear_late_stance_contact_ready_debug[:] = 0
+        self.rear_all_contact_support_needed_debug[:] = 0
+        self.rear_late_seam_support_active_debug[:] = 0
+        self.rear_close_handoff_active_debug[:] = 0
+        self.rear_late_load_share_active_debug[:] = 0
+        self.rear_late_load_share_alpha_debug[:] = 0.0
+        self.rear_late_load_share_candidate_active_debug[:] = 0
+        self.rear_late_load_share_candidate_alpha_debug[:] = 0.0
+        self.rear_late_load_share_trigger_enabled_debug = 0
+        self.full_contact_recovery_trigger_debug = 0
+        self.front_delayed_swing_recovery_trigger_debug = 0
+        self.planted_front_recovery_trigger_debug = 0
+        self.planted_front_postdrop_recovery_trigger_debug = 0
+        self.front_close_gap_trigger_debug = 0
+        self.front_late_rearm_trigger_debug = 0
+        self.front_planted_posture_tail_trigger_debug = 0
+        self.front_late_posture_tail_trigger_debug = 0
         self.touchdown_support_alpha = 0.0
         self.front_touchdown_support_alpha = 0.0
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
+        self.rear_all_contact_front_planted_tail_alpha = 0.0
+        self.crawl_front_planted_seam_support_alpha = 0.0
+        self.rear_all_contact_weak_leg_alpha = 0.0
+        self.rear_all_contact_weak_leg_index = -1
+        self.rear_close_handoff_alpha = 0.0
+        self.rear_close_handoff_leg_index = -1
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
         self.front_margin_rescue_active[:] = 0
         self.front_margin_rescue_alpha[:] = 0.0
         self.rear_handoff_support_active = 0
@@ -1714,6 +2119,7 @@ class WBInterface:
         self.full_contact_recovery_alpha = 0.0
         self.front_stance_dropout_support_remaining_s[:] = 0.0
         self.last_gate_forward_scale = 1.0
+        self.rear_retry_contact_signal_debug[:] = np.asarray(rear_retry_contact_signal, dtype=int)
         if getattr(contact_sequence, "ndim", 0) == 2 and contact_sequence.shape[0] == 4:
             gate_forward_scale = 1.0
             requested_gate_forward_scale = 1.0
@@ -1756,6 +2162,58 @@ class WBInterface:
                     release_timeout_s = self._swing_contact_release_timeout_for_leg(leg_id)
                     planned_swing = bool(int(self.planned_contact[leg_id]) == 0)
                     stuck_in_contact = planned_swing and bool(actual_contact[leg_id]) and (not startup_full_stance_active)
+                    if (
+                        int(leg_id) < 2
+                        and self.gait_name == 'crawl'
+                        and release_timeout_s <= 1e-9
+                        and float(getattr(self, 'crawl_front_stuck_swing_release_timeout_s', 0.0)) > 1e-9
+                    ):
+                        ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
+                        height_ratio = float(base_pos_measured[2]) / ref_height
+                        roll_mag = abs(float(base_ori_euler_xyz[0]))
+                        pitch_mag = abs(float(base_ori_euler_xyz[1]))
+                        front_single_planned_swing = bool(
+                            np.count_nonzero(np.asarray(contact_sequence[0:2, 0], dtype=int) == 0) == 1
+                        )
+                        rear_contacts_stable = bool(
+                            np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                            and np.all(np.asarray(actual_contact[2:4], dtype=int) == 1)
+                        )
+                        recent_crawl_recovery = bool(
+                            prev_full_contact_recovery_active
+                            or prev_rear_all_contact_alpha > 1e-9
+                            or np.any(np.asarray(prev_touchdown_support_active[2:4], dtype=int) == 1)
+                            or float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                        )
+                        posture_bad = bool(
+                            (
+                                float(getattr(self, 'crawl_front_stuck_swing_release_height_ratio', 0.0)) > 1e-9
+                                and float(height_ratio)
+                                <= float(getattr(self, 'crawl_front_stuck_swing_release_height_ratio', 0.0))
+                            )
+                            or (
+                                np.isfinite(getattr(self, 'crawl_front_stuck_swing_release_roll_threshold', np.inf))
+                                and float(roll_mag)
+                                >= float(getattr(self, 'crawl_front_stuck_swing_release_roll_threshold', np.inf))
+                            )
+                            or (
+                                np.isfinite(getattr(self, 'crawl_front_stuck_swing_release_pitch_threshold', np.inf))
+                                and float(pitch_mag)
+                                >= float(getattr(self, 'crawl_front_stuck_swing_release_pitch_threshold', np.inf))
+                            )
+                        )
+                        if (
+                            stuck_in_contact
+                            and bool(int(self.current_contact[leg_id]) == 1)
+                            and full_contact_now
+                            and front_single_planned_swing
+                            and rear_contacts_stable
+                            and recent_crawl_recovery
+                            and posture_bad
+                        ):
+                            release_timeout_s = float(
+                                getattr(self, 'crawl_front_stuck_swing_release_timeout_s', 0.0)
+                            )
                     if (not stuck_in_contact) or release_timeout_s <= 1e-9:
                         self.swing_contact_release_elapsed_s[leg_id] = 0.0
                         continue
@@ -1829,6 +2287,19 @@ class WBInterface:
                         pitch_mag = abs(float(base_ori_euler_xyz[1]))
                         ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
                         height_ratio = float(base_pos_measured[2]) / ref_height
+                        support_margin = self._pre_swing_gate_margin(
+                            leg_id,
+                            actual_contact,
+                            feet_pos,
+                            com_pos_measured,
+                            com_vel_xy=base_lin_vel[0:2],
+                        )
+                        front_guard_release_ready = bool(
+                            np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                            and np.all(np.asarray(actual_contact[2:4], dtype=int) == 1)
+                            and float(support_margin)
+                            >= float(getattr(self, 'front_rear_transition_guard_margin_release', 0.0))
+                        )
                         (
                             front_rear_transition_guard,
                             front_transition_guard_remaining_s,
@@ -1839,11 +2310,16 @@ class WBInterface:
                             scheduled_swing=scheduled_swing,
                             current_contact=bool(self.current_contact[leg_id]),
                             actual_contact=bool(actual_contact[leg_id]),
-                            rear_transition_active=rear_transition_recovery_context_active,
+                            rear_transition_active=front_guard_rear_transition_context_active,
                             roll_mag=roll_mag,
                             pitch_mag=pitch_mag,
                             height_ratio=height_ratio,
                             simulation_dt=simulation_dt,
+                            rear_support_active=bool(
+                                np.any(np.asarray(prev_touchdown_support_active[2:4], dtype=int) == 1)
+                            ),
+                            rear_all_contact_active=bool(prev_rear_all_contact_alpha > 1e-9),
+                            rear_contacts_stable=front_guard_release_ready,
                         )
                     if front_rear_transition_guard:
                         gate_forward_scale = min(
@@ -2066,7 +2542,12 @@ class WBInterface:
 
             for leg_id in range(2, 4):
                 planned_stance = bool(int(self.planned_contact[leg_id]) == 1)
-                waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                waiting_for_recontact = self._rear_waiting_for_recontact(
+                    leg_id,
+                    planned_stance=planned_stance,
+                    actual_contact=actual_contact,
+                    prev_reacquire_active=prev_touchdown_reacquire_active,
+                )
                 if not self.rear_transition_manager.should_delay_reacquire(
                     planned_stance=planned_stance,
                     waiting_for_recontact=waiting_for_recontact,
@@ -2084,7 +2565,12 @@ class WBInterface:
                 planned_stance = bool(contact_sequence[leg_id][0] == 1)
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
-                waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                waiting_for_recontact = self._rear_waiting_for_recontact(
+                    leg_id,
+                    planned_stance=planned_stance,
+                    actual_contact=actual_contact,
+                    prev_reacquire_active=prev_touchdown_reacquire_active,
+                )
                 contact_ready = self._touchdown_contact_ready_for_leg(
                     leg_id,
                     rear_retry_contact_signal if leg_id >= 2 else actual_contact,
@@ -2153,7 +2639,12 @@ class WBInterface:
                 planned_stance = bool(contact_sequence[leg_id][0] == 1)
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
-                waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                waiting_for_recontact = self._rear_waiting_for_recontact(
+                    leg_id,
+                    planned_stance=planned_stance,
+                    actual_contact=actual_contact,
+                    prev_reacquire_active=prev_touchdown_reacquire_active,
+                )
                 contact_ready = self._touchdown_contact_ready_for_leg(
                     leg_id,
                     rear_retry_contact_signal if leg_id >= 2 else actual_contact,
@@ -2212,7 +2703,12 @@ class WBInterface:
                 planned_stance = bool(contact_sequence[leg_id][0] == 1)
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
-                waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                waiting_for_recontact = self._rear_waiting_for_recontact(
+                    leg_id,
+                    planned_stance=planned_stance,
+                    actual_contact=actual_contact,
+                    prev_reacquire_active=prev_touchdown_reacquire_active,
+                )
                 contact_ready = self._touchdown_contact_ready_for_leg(
                     leg_id,
                     rear_retry_contact_signal if leg_id >= 2 else actual_contact,
@@ -2356,11 +2852,19 @@ class WBInterface:
             front_support_alpha = 0.0
             rear_support_alpha = 0.0
             rear_all_contact_alpha = 0.0
+            front_close_gap_keep_swing_mask = np.zeros(2, dtype=bool)
+            front_planted_seam_keep_swing_mask = np.zeros(2, dtype=bool)
             recovery_hold_s = float(self.full_contact_recovery_hold_s)
             if recovery_hold_s > 1e-9:
                 actual_contact_array = np.asarray(actual_contact, dtype=int)
+                transition_contact_array = np.asarray(transition_contact, dtype=int)
                 previous_actual_contact_array = np.asarray(self.previous_actual_contact, dtype=int)
-                all_contact_now = bool(np.all(actual_contact_array == 1))
+                # For late crawl seams, the foot-contact signal often returns one or
+                # two control ticks before the stricter MuJoCo geometry contact
+                # closes the current-contact state. Let full-contact recovery key off
+                # the earlier transition contact so the all-contact stabilization
+                # window can start as soon as the leg has physically re-touched.
+                all_contact_now = bool(np.all(transition_contact_array == 1))
                 all_contact_prev = bool(np.all(previous_actual_contact_array == 1))
                 roll_mag = abs(float(base_ori_euler_xyz[0]))
                 pitch_mag = abs(float(base_ori_euler_xyz[1]))
@@ -2369,6 +2873,20 @@ class WBInterface:
                 recent_gate_ok = (
                     float(self.full_contact_recovery_recent_window_s) <= 1e-9
                     or float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                )
+                front_close_gap_reclose_now = bool(
+                    self.gait_name == 'crawl'
+                    and all_contact_now
+                    and (not all_contact_prev)
+                    and np.any(
+                        (np.asarray(self.planned_contact[0:2], dtype=int) == 1)
+                        & (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                        & (previous_actual_contact_array[0:2] == 0)
+                        & (actual_contact_array[0:2] == 1)
+                    )
+                    and np.all(np.asarray(self.planned_contact[2:4], dtype=int) == 1)
+                    and np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                    and np.all(actual_contact_array[2:4] == 1)
                 )
                 recovery_posture_needed = bool(
                     roll_mag >= float(self.full_contact_recovery_roll_threshold)
@@ -2385,6 +2903,7 @@ class WBInterface:
                     and (not all_contact_prev)
                     and recovery_posture_needed
                 )
+                self.full_contact_recovery_trigger_debug = int(bool(recovery_trigger))
                 if recovery_trigger:
                     self.full_contact_recovery_remaining_s = max(
                         float(self.full_contact_recovery_remaining_s),
@@ -2393,29 +2912,236 @@ class WBInterface:
                 delayed_front_swing_recovery_hold_s = float(
                     getattr(self, 'crawl_front_delayed_swing_recovery_hold_s', 0.0)
                 )
+                front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
+                front_support_margins = np.full(2, np.inf, dtype=float)
+                delayed_front_margin_threshold = float(
+                    getattr(self, 'crawl_front_delayed_swing_recovery_margin_threshold', 0.0)
+                )
                 if delayed_front_swing_recovery_hold_s > 1e-9:
-                    front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
+                    delayed_front_recovery_once_per_swing = bool(
+                        getattr(self, 'crawl_front_delayed_swing_recovery_once_per_swing', False)
+                    )
+                    if delayed_front_recovery_once_per_swing:
+                        self.front_delayed_swing_recovery_spent[np.logical_not(front_planned_swing)] = 0
                     front_realized_stance = (
                         (np.asarray(self.current_contact[0:2], dtype=int) == 1)
                         & (actual_contact_array[0:2] == 1)
+                    )
+                    front_support_margins = np.asarray(
+                        [
+                            self._pre_swing_gate_margin(
+                                leg_id,
+                                actual_contact,
+                                feet_pos,
+                                com_pos_measured,
+                                com_vel_xy=base_lin_vel[0:2],
+                            )
+                            for leg_id in range(2)
+                        ],
+                        dtype=float,
+                    )
+                    delayed_front_release_tail_s = float(
+                        getattr(self, 'crawl_front_delayed_swing_recovery_release_tail_s', 0.0)
+                    )
+                    delayed_front_rearm_trigger_s = float(
+                        getattr(self, 'crawl_front_delayed_swing_recovery_rearm_trigger_s', 0.0)
+                    )
+                    eligible_front_delayed_swing = (
+                        front_planned_swing
+                        & front_realized_stance
+                        & (front_support_margins <= delayed_front_margin_threshold)
+                    )
+                    if delayed_front_recovery_once_per_swing:
+                        eligible_front_delayed_swing &= (
+                            np.asarray(self.front_delayed_swing_recovery_spent, dtype=int) == 0
+                        )
+                    delayed_front_recovery_near_expiry = bool(
+                        (prev_full_contact_recovery_active or float(self.full_contact_recovery_remaining_s) > 1e-9)
+                        and (
+                            delayed_front_rearm_trigger_s <= 1e-9
+                            or float(self.full_contact_recovery_remaining_s)
+                            <= delayed_front_rearm_trigger_s + 1e-12
+                        )
                     )
                     front_delayed_swing_recovery = bool(
                         (not startup_full_stance_active)
                         and self.gait_name == 'crawl'
                         and all_contact_now
                         and recovery_posture_needed
-                        and np.any(front_planned_swing & front_realized_stance)
+                        and delayed_front_recovery_near_expiry
+                        and np.any(eligible_front_delayed_swing)
                     )
+                    self.front_delayed_swing_recovery_trigger_debug = int(bool(front_delayed_swing_recovery))
                     if front_delayed_swing_recovery:
                         self.full_contact_recovery_remaining_s = max(
                             float(self.full_contact_recovery_remaining_s),
                             delayed_front_swing_recovery_hold_s,
                         )
+                        if delayed_front_recovery_once_per_swing:
+                            self.front_delayed_swing_recovery_spent[eligible_front_delayed_swing] = 1
+                    if delayed_front_release_tail_s > 1e-9:
+                        releasable_front_delayed_swing = (
+                            front_planned_swing
+                            & front_realized_stance
+                            & (front_support_margins > delayed_front_margin_threshold)
+                        )
+                        if np.any(releasable_front_delayed_swing):
+                            self.full_contact_recovery_remaining_s = min(
+                                float(self.full_contact_recovery_remaining_s),
+                                delayed_front_release_tail_s,
+                            )
+                planted_front_recovery_hold_s = float(
+                    getattr(self, 'crawl_front_planted_swing_recovery_hold_s', 0.0)
+                )
+                if planted_front_recovery_hold_s > 1e-9:
+                    self.front_planted_swing_recovery_spent[np.logical_not(front_planned_swing)] = 0
+                    front_planted_late_leg = (
+                        front_planned_swing
+                        & (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                        & (actual_contact_array[0:2] == 1)
+                    )
+                    front_planted_recovery_leg = np.asarray(front_planted_late_leg, dtype=bool).copy()
+                    front_planted_recovery_leg &= (
+                        np.asarray(self.front_planted_swing_recovery_spent, dtype=int) == 0
+                    )
+                    rear_contacts_stable = bool(
+                        np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                        and np.all(actual_contact_array[2:4] == 1)
+                    )
+                    planted_front_height_ratio = float(
+                        getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)
+                    )
+                    planted_front_roll_threshold = getattr(
+                        self,
+                        'crawl_front_planted_swing_recovery_roll_threshold',
+                        None,
+                    )
+                    planted_front_posture_bad = bool(
+                        (
+                            planted_front_height_ratio > 1e-9
+                            and float(height_ratio) <= float(planted_front_height_ratio)
+                        )
+                        or (
+                            planted_front_roll_threshold is not None
+                            and np.isfinite(float(planted_front_roll_threshold))
+                            and float(roll_mag) >= float(planted_front_roll_threshold)
+                        )
+                    )
+                    planted_front_recovery_rearm_trigger_s = float(
+                        getattr(self, 'crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)
+                    )
+                    planted_front_recovery_near_expiry = bool(
+                        (prev_full_contact_recovery_active or float(self.full_contact_recovery_remaining_s) > 1e-9)
+                        and (
+                            planted_front_recovery_rearm_trigger_s <= 1e-9
+                            or float(self.full_contact_recovery_remaining_s)
+                            <= planted_front_recovery_rearm_trigger_s + 1e-12
+                        )
+                    )
+                    planted_front_recovery_trigger = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and np.count_nonzero(front_planned_swing) == 1
+                        and rear_contacts_stable
+                        and planted_front_posture_bad
+                        and planted_front_recovery_near_expiry
+                        and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                        and np.any(
+                            front_planted_recovery_leg
+                            & (
+                                front_support_margins
+                                <= float(
+                                    getattr(
+                                        self,
+                                        'crawl_front_planted_swing_recovery_margin_threshold',
+                                        0.0,
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    self.planted_front_recovery_trigger_debug = int(bool(planted_front_recovery_trigger))
+                    front_planted_posture_tail_candidate = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and np.count_nonzero(front_planned_swing) == 1
+                        and np.any(front_planted_late_leg)
+                        and rear_contacts_stable
+                        and planted_front_posture_bad
+                        and planted_front_recovery_near_expiry
+                        and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                        and np.any(
+                            front_planted_late_leg
+                            & (
+                                front_support_margins
+                                <= float(
+                                    getattr(
+                                        self,
+                                        'crawl_front_planted_swing_recovery_margin_threshold',
+                                        0.0,
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    if planted_front_recovery_trigger:
+                        self.full_contact_recovery_remaining_s = max(
+                            float(self.full_contact_recovery_remaining_s),
+                            planted_front_recovery_hold_s,
+                        )
+                        self.front_planted_swing_recovery_spent[front_planned_swing] = 1
+                    planted_front_postdrop_recovery_hold_s = float(
+                        getattr(self, 'crawl_front_planted_postdrop_recovery_hold_s', 0.0)
+                    )
+                    planted_front_postdrop_recovery_trigger = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and planted_front_postdrop_recovery_hold_s > 1e-9
+                        and prev_full_contact_recovery_active
+                        and int(self.full_contact_recovery_active) == 0
+                        and np.count_nonzero(front_planned_swing) == 1
+                        and np.any(front_planted_late_leg)
+                        and rear_contacts_stable
+                        and planted_front_posture_bad
+                        and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                        and np.any(
+                            front_planted_late_leg
+                            & (
+                                front_support_margins
+                                <= float(
+                                    getattr(
+                                        self,
+                                        'crawl_front_planted_swing_recovery_margin_threshold',
+                                        0.0,
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    self.planted_front_postdrop_recovery_trigger_debug = int(
+                        bool(planted_front_postdrop_recovery_trigger)
+                    )
+                    if planted_front_postdrop_recovery_trigger:
+                        # The best crawl run still collapses almost immediately
+                        # after late full-contact recovery releases while the
+                        # same front planned-swing leg remains physically
+                        # planted. Grant one extra short recovery chunk on that
+                        # falling edge instead of broadening earlier recovery
+                        # windows that already proved counterproductive.
+                        self.full_contact_recovery_remaining_s = max(
+                            float(self.full_contact_recovery_remaining_s),
+                            planted_front_postdrop_recovery_hold_s,
+                        )
+                else:
+                    front_planted_posture_tail_candidate = False
                 front_stance_support_tail_hold_s = float(
                     getattr(self, 'crawl_front_stance_support_tail_hold_s', 0.0)
                 )
                 if front_stance_support_tail_hold_s > 1e-9:
-                    front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
+                    front_current_swing_state = (
+                        front_planned_swing
+                        & (np.asarray(self.current_contact[0:2], dtype=int) == 0)
+                    )
                     front_actual_swing_opened = (
                         (previous_actual_contact_array[0:2] == 1)
                         & (actual_contact_array[0:2] == 0)
@@ -2435,6 +3161,87 @@ class WBInterface:
                             float(self.crawl_front_stance_support_tail_remaining_s),
                             front_stance_support_tail_hold_s,
                         )
+                front_close_gap_support_hold_s = float(
+                    getattr(self, 'crawl_front_close_gap_support_hold_s', 0.0)
+                )
+                if front_close_gap_support_hold_s > 1e-9:
+                    front_close_gap_state = (
+                        (np.asarray(contact_sequence[0:2, 0], dtype=int) == 1)
+                        & (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                        & (actual_contact_array[0:2] == 0)
+                    )
+                    front_close_gap_trigger = bool(
+                        (not startup_full_stance_active)
+                        and self.gait_name == 'crawl'
+                        and recovery_posture_needed
+                        and np.any(front_close_gap_state)
+                        and bool(np.all(actual_contact_array[2:4] == 1))
+                        and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                    )
+                    self.front_close_gap_trigger_debug = int(bool(front_close_gap_trigger))
+                    if front_close_gap_trigger:
+                        self.full_contact_recovery_remaining_s = max(
+                            float(self.full_contact_recovery_remaining_s),
+                            front_close_gap_support_hold_s,
+                        )
+                        self.crawl_front_stance_support_tail_remaining_s = max(
+                            float(self.crawl_front_stance_support_tail_remaining_s),
+                            front_close_gap_support_hold_s,
+                        )
+                        if bool(getattr(self, 'crawl_front_close_gap_keep_swing', False)):
+                            front_close_gap_keep_swing_mask = np.asarray(front_close_gap_state, dtype=bool).copy()
+                front_late_posture_tail_candidate = False
+                front_late_rearm_tail_hold_s = float(
+                    getattr(self, 'crawl_front_late_rearm_tail_hold_s', 0.0)
+                )
+                if front_late_rearm_tail_hold_s > 1e-9:
+                    self.front_late_rearm_used_s[np.logical_not(front_planned_swing)] = 0.0
+                    front_current_swing_state = (
+                        front_planned_swing
+                        & (np.asarray(self.current_contact[0:2], dtype=int) == 0)
+                    )
+                    if np.count_nonzero(front_current_swing_state) == 1:
+                        front_swing_leg_id = int(np.flatnonzero(front_current_swing_state)[0])
+                        front_swing_time = float(self.stc.swing_time[front_swing_leg_id])
+                        front_late_rearm_budget_s = max(
+                            float(getattr(self, 'crawl_front_late_rearm_budget_s', 0.0)),
+                            front_late_rearm_tail_hold_s,
+                        )
+                        front_late_rearm_remaining_budget_s = max(
+                            0.0,
+                            float(front_late_rearm_budget_s)
+                            - float(self.front_late_rearm_used_s[front_swing_leg_id]),
+                        )
+                        front_late_rearm_chunk_s = min(
+                            float(front_late_rearm_tail_hold_s),
+                            float(front_late_rearm_remaining_budget_s),
+                        )
+                        front_late_rearm_trigger = bool(
+                            (not startup_full_stance_active)
+                            and self.gait_name == 'crawl'
+                            and recovery_posture_needed
+                            and bool(np.all(actual_contact_array[2:4] == 1))
+                            and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+                            and float(self.full_contact_recovery_remaining_s) <= 1e-9
+                            and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                            and front_swing_time
+                            >= float(getattr(self, 'crawl_front_late_rearm_min_swing_time_s', 0.0))
+                            and float(front_support_margins[front_swing_leg_id])
+                            <= -float(getattr(self, 'crawl_front_late_rearm_min_negative_margin', 0.0))
+                            and float(front_late_rearm_chunk_s) > 1e-9
+                        )
+                        self.front_late_rearm_trigger_debug = int(bool(front_late_rearm_trigger))
+                        front_late_posture_tail_candidate = bool(front_late_rearm_trigger)
+                        if front_late_rearm_trigger:
+                            self.crawl_front_stance_support_tail_remaining_s = max(
+                                float(self.crawl_front_stance_support_tail_remaining_s),
+                                float(front_late_rearm_chunk_s),
+                            )
+                            self.front_late_rearm_used_s[front_swing_leg_id] = min(
+                                float(front_late_rearm_budget_s),
+                                float(self.front_late_rearm_used_s[front_swing_leg_id])
+                                + float(front_late_rearm_chunk_s),
+                            )
                 if self.full_contact_recovery_remaining_s > 1e-9:
                     self.full_contact_recovery_active = 1
                     self.full_contact_recovery_alpha = 1.0
@@ -2544,11 +3351,19 @@ class WBInterface:
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
                 if int(leg_id) >= 2:
-                    waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                    waiting_for_recontact = self._rear_waiting_for_recontact(
+                        leg_id,
+                        planned_stance=planned_stance,
+                        actual_contact=actual_contact,
+                        prev_reacquire_active=prev_touchdown_reacquire_active,
+                    )
+                    late_stance_scheduled = bool(int(self.planned_contact[leg_id]) == 1)
                     rear_contact_returned_now = bool(actual_contact[leg_id]) and (
                         not bool(self.previous_actual_contact[leg_id])
                     )
                     pitch_mag = abs(float(base_ori_euler_xyz[1]))
+                    roll_mag = abs(float(base_ori_euler_xyz[0]))
+                    height_ratio = float(base_pos_measured[2]) / max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
                     rear_contact_ready = self._rear_touchdown_contact_ready(
                         leg_id,
                         rear_retry_contact_signal,
@@ -2557,20 +3372,24 @@ class WBInterface:
                         swing_phase=swing_phase,
                         waiting_for_recontact=waiting_for_recontact,
                     )
+                    self.rear_touchdown_contact_ready_debug[leg_id] = int(bool(rear_contact_ready))
                     late_stance_contact_ready = self.rear_transition_manager.should_accept_late_stance_contact(
                         leg_id,
                         rear_retry_contact_signal,
                         gait_name=self.gait_name,
-                        planned_stance=planned_stance,
+                        planned_stance=late_stance_scheduled,
                         waiting_for_recontact=waiting_for_recontact,
                         actual_contact=bool(actual_contact[leg_id]),
                         previous_actual_contact=bool(self.previous_actual_contact[leg_id]),
-                        recovery_active=bool(int(self.full_contact_recovery_active) == 1),
+                        recovery_active=bool(rear_transition_recovery_context_active),
+                        roll_mag=roll_mag,
                         pitch_mag=pitch_mag,
+                        height_ratio=height_ratio,
                         current_foot_vz=current_foot_vz,
                         foot_grf_world=foot_grf_world,
                     )
-                    if planned_stance and waiting_for_recontact and late_stance_contact_ready:
+                    self.rear_late_stance_contact_ready_debug[leg_id] = int(bool(late_stance_contact_ready))
+                    if late_stance_scheduled and waiting_for_recontact and late_stance_contact_ready:
                         self._clear_touchdown_reacquire_state(leg_id, clear_retry_count=True)
                         self.touchdown_settle_remaining_s[leg_id] = max(
                             float(self.touchdown_settle_remaining_s[leg_id]),
@@ -2621,6 +3440,12 @@ class WBInterface:
                         # immediately instead of keeping the leg in the slower
                         # reacquire path for another long seam.
                         contact_sequence[leg_id][0] = 1
+                        # Only bridge the pre-stance case where the rear foot has
+                        # already come back with valid contact but the gait schedule
+                        # still marks swing for a short moment. Arming the same lock
+                        # again after normal planned-stance close made crawl overly
+                        # sticky and suppressed front swing.
+                        self._arm_rear_touchdown_close_lock(leg_id)
                         self._clear_touchdown_reacquire_state(leg_id, clear_retry_count=True)
                         self.touchdown_settle_remaining_s[leg_id] = max(
                             float(self.touchdown_settle_remaining_s[leg_id]),
@@ -2680,7 +3505,12 @@ class WBInterface:
             if not rear_pending_recontact_support:
                 for leg_id in range(2, 4):
                     planned_stance = bool(int(self.planned_contact[leg_id]) == 1)
-                    waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                    waiting_for_recontact = self._rear_waiting_for_recontact(
+                        leg_id,
+                        planned_stance=planned_stance,
+                        actual_contact=actual_contact,
+                        prev_reacquire_active=prev_touchdown_reacquire_active,
+                    )
                     current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                     swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
                     rear_contact_ready = self._rear_touchdown_contact_ready(
@@ -2778,6 +3608,18 @@ class WBInterface:
                             self.touchdown_support_active[leg_id] = 1
                             support_alpha = 1.0
                             front_support_alpha = 1.0
+                    rear_single_support_ids = [
+                        leg_id
+                        for leg_id in range(2, 4)
+                        if bool(contact_sequence[leg_id][0] == 1) and bool(actual_contact[leg_id])
+                    ]
+                    if len(rear_single_support_ids) == 1:
+                        rear_handoff_rear_alpha = float(
+                            getattr(self, 'rear_handoff_support_rear_alpha_scale', 0.0)
+                        )
+                        if rear_handoff_rear_alpha > 1e-9:
+                            self.touchdown_support_active[rear_single_support_ids[0]] = 1
+                            rear_support_alpha = max(float(rear_support_alpha), rear_handoff_rear_alpha)
                 elif not rear_transition_active:
                     self.rear_handoff_support_remaining_s = 0.0
                     self.rear_handoff_support_mask[:] = 0
@@ -2837,6 +3679,26 @@ class WBInterface:
                         float(self.rear_swing_bridge_remaining_s),
                         bridge_hold_s,
                     )
+                bridge_release_tail_s = float(
+                    getattr(self, 'rear_swing_bridge_allcontact_release_tail_s', 0.0)
+                )
+                if bridge_release_tail_s > 1e-9:
+                    rear_bridge_clear_now = bool(
+                        all_contact_now
+                        and np.all(np.asarray(contact_sequence[2:4, 0], dtype=int) == 1)
+                        and np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                        and np.all(actual_contact_array[2:4] == 1)
+                        and (not rear_planned_swing)
+                        and (not rear_current_swing)
+                        and (not rear_pending_recontact)
+                        and (not np.any(np.asarray(self.touchdown_confirm_active[2:4], dtype=int) == 1))
+                        and (not np.any(np.asarray(self.touchdown_settle_active[2:4], dtype=int) == 1))
+                    )
+                    if rear_bridge_clear_now and float(self.rear_swing_bridge_remaining_s) > bridge_release_tail_s:
+                        self.rear_swing_bridge_remaining_s = min(
+                            float(self.rear_swing_bridge_remaining_s),
+                            bridge_release_tail_s,
+                        )
                 if self.rear_swing_bridge_remaining_s > 1e-9:
                     self.rear_swing_bridge_active = 1
                     gate_forward_scale = min(gate_forward_scale, float(self.rear_swing_bridge_forward_scale))
@@ -2854,6 +3716,18 @@ class WBInterface:
                         self.touchdown_support_active[leg_id] = 1
                         support_alpha = 1.0
                         front_support_alpha = 1.0
+                rear_single_support_ids = [
+                    leg_id
+                    for leg_id in range(2, 4)
+                    if bool(contact_sequence[leg_id][0] == 1) and bool(actual_contact[leg_id])
+                ]
+                if len(rear_single_support_ids) == 1:
+                    rear_bridge_rear_alpha = float(
+                        getattr(self, 'rear_swing_bridge_rear_alpha_scale', 0.0)
+                    )
+                    if rear_bridge_rear_alpha > 1e-9:
+                        self.touchdown_support_active[rear_single_support_ids[0]] = 1
+                        rear_support_alpha = max(float(rear_support_alpha), rear_bridge_rear_alpha)
             if int(self.full_contact_recovery_active) == 1:
                 # Full-contact recovery is meant to keep the front touchdown-style
                 # support overrides alive briefly after all feet have come back.
@@ -2908,9 +3782,12 @@ class WBInterface:
             height_ratio = float(base_pos_measured[2]) / ref_height
             vertical_grf = np.maximum(np.asarray(foot_grf_world, dtype=float)[:, 2], 0.0)
             total_vertical_grf = max(float(np.sum(vertical_grf)), 1e-6)
+            rear_vertical_grf = max(float(np.sum(vertical_grf[2:4])), 1e-6)
             rear_load_share = float(np.sum(vertical_grf[2:4])) / total_vertical_grf
+            rear_pair_leg_shares = np.asarray(vertical_grf[2:4], dtype=float) / rear_vertical_grf
+            weak_rear_leg_load_share = float(np.min(rear_pair_leg_shares))
             for leg_id in range(2, 4):
-                rear_leg_load_share = float(vertical_grf[leg_id]) / total_vertical_grf
+                rear_leg_load_share = float(rear_pair_leg_shares[leg_id - 2])
                 recent_rear_touchdown = bool(
                     bool(actual_contact[leg_id]) and (not bool(self.previous_actual_contact[leg_id]))
                 ) or bool(prev_touchdown_reacquire_active[leg_id]) or bool(int(self.touchdown_confirm_active[leg_id]) == 1) or bool(
@@ -2949,6 +3826,10 @@ class WBInterface:
                 rear_support_alpha = max(float(rear_support_alpha), 1.0)
                 gate_forward_scale = min(gate_forward_scale, float(post_support_forward_scale))
             if float(self.crawl_front_stance_support_tail_remaining_s) > 1e-9:
+                gate_forward_scale = min(
+                    gate_forward_scale,
+                    float(getattr(self, 'crawl_front_stance_support_tail_forward_scale', 1.0)),
+                )
                 for leg_id in range(2):
                     if bool(contact_sequence[leg_id][0] == 1) and bool(actual_contact[leg_id]):
                         self.touchdown_support_active[leg_id] = 1
@@ -2989,11 +3870,85 @@ class WBInterface:
                         >= float(getattr(self, 'rear_all_contact_stabilization_pitch_threshold', np.inf))
                     )
                 )
+                self.rear_all_contact_support_needed_debug[leg_id] = int(bool(all_contact_support_needed))
                 recent_rear_touchdown = bool(
                     bool(actual_contact[leg_id]) and (not bool(self.previous_actual_contact[leg_id]))
                 ) or bool(prev_touchdown_reacquire_active[leg_id]) or bool(
                     int(self.touchdown_confirm_active[leg_id]) == 1
                 ) or bool(int(self.touchdown_settle_active[leg_id]) == 1)
+                seam_waiting_for_recontact = bool(
+                    self._rear_waiting_for_recontact(
+                        leg_id,
+                        planned_stance=bool(contact_sequence[leg_id][0] == 1),
+                        actual_contact=actual_contact,
+                        prev_reacquire_active=prev_touchdown_reacquire_active,
+                    )
+                    or bool(int(self.touchdown_reacquire_active[leg_id]) == 1)
+                )
+                preclose_pitch_bad = bool(
+                    np.isfinite(getattr(self, 'rear_all_contact_stabilization_preclose_pitch_threshold', np.inf))
+                    and float(pitch_mag)
+                    >= float(getattr(self, 'rear_all_contact_stabilization_preclose_pitch_threshold', np.inf))
+                )
+                preclose_descending_bad = bool(
+                    float(base_lin_vel[2])
+                    <= float(getattr(self, 'rear_all_contact_stabilization_preclose_vz_threshold', -np.inf))
+                )
+                late_stance_scheduled = bool(int(self.planned_contact[leg_id]) == 1)
+                late_seam_open_with_actual = bool(
+                    self.gait_name == 'crawl'
+                    and late_stance_scheduled
+                    and bool(actual_contact[leg_id])
+                    and bool(self.current_contact[leg_id] == 0)
+                    and all_actual_contact
+                    and seam_waiting_for_recontact
+                )
+                if late_seam_open_with_actual:
+                    self.rear_late_seam_elapsed_s[leg_id] = min(
+                        float(self.rear_late_seam_elapsed_s[leg_id]) + float(simulation_dt),
+                        max(float(self.rear_late_seam_support_trigger_s), float(simulation_dt)),
+                    )
+                else:
+                    self.rear_late_seam_elapsed_s[leg_id] = 0.0
+                # The remaining crawl failure happens in the short seam where the
+                # rear foot is already back on the ground, all four feet are
+                # physically in contact, but the controller-side rear contact is
+                # still open. Start applying the late all-contact support shaping
+                # through that pre-close seam instead of waiting for the current
+                # contact latch to close one or two steps later.
+                preclose_all_contact_active = bool(
+                    self.gait_name == 'crawl'
+                    and bool(contact_sequence[leg_id][0] == 1)
+                    and bool(actual_contact[leg_id])
+                    and bool(self.current_contact[leg_id] == 0)
+                    and all_actual_contact
+                    and all_contact_support_needed
+                    and seam_waiting_for_recontact
+                    and preclose_descending_bad
+                    and preclose_pitch_bad
+                )
+                late_seam_trigger = bool(
+                    late_seam_open_with_actual
+                    and all_contact_support_needed
+                    and float(self.rear_late_seam_support_trigger_s) > 1e-9
+                    and float(self.rear_late_seam_elapsed_s[leg_id]) + 1e-12
+                    >= float(self.rear_late_seam_support_trigger_s)
+                    and (not self.rear_transition_manager.all_contact_stabilization_running(leg_id))
+                )
+                if preclose_all_contact_active:
+                    self.touchdown_support_active[leg_id] = 1
+                    support_alpha = max(float(support_alpha), 1.0)
+                    rear_support_alpha = max(float(rear_support_alpha), 1.0)
+                    rear_all_contact_alpha = max(float(rear_all_contact_alpha), 1.0)
+                    gate_forward_scale = min(
+                        gate_forward_scale,
+                        float(getattr(self, 'rear_all_contact_stabilization_forward_scale', 1.0)),
+                    )
+                    if front_support_alpha > 1e-9:
+                        front_support_alpha = min(
+                            float(front_support_alpha),
+                            float(getattr(self, 'rear_all_contact_stabilization_front_alpha_scale', 1.0)),
+                        )
                 all_contact_trigger = bool(
                     self.gait_name == 'crawl'
                     and bool(contact_sequence[leg_id][0] == 1)
@@ -3010,8 +3965,8 @@ class WBInterface:
                     all_contact_front_alpha_scale,
                 ) = self.rear_transition_manager.update_all_contact_stabilization_window(
                     leg_id,
-                    trigger=all_contact_trigger,
-                    planned_stance=bool(contact_sequence[leg_id][0] == 1),
+                    trigger=bool(all_contact_trigger or late_seam_trigger),
+                    planned_stance=late_stance_scheduled or late_seam_open_with_actual,
                     actual_contact=bool(actual_contact[leg_id]),
                     all_actual_contact=all_actual_contact,
                     simulation_dt=float(simulation_dt),
@@ -3020,6 +3975,9 @@ class WBInterface:
                     pitch_mag=pitch_mag,
                     rear_load_share=rear_load_share,
                     rear_leg_load_share=rear_leg_load_share,
+                )
+                self.rear_late_seam_support_active_debug[leg_id] = int(
+                    bool(late_seam_open_with_actual and all_contact_active)
                 )
                 if not all_contact_active:
                     continue
@@ -3039,9 +3997,545 @@ class WBInterface:
             self.front_touchdown_support_alpha = float(front_support_alpha)
             self.rear_touchdown_support_alpha = float(rear_support_alpha)
             self.rear_all_contact_stabilization_alpha = float(rear_all_contact_alpha)
+            planned_all_contact_now = bool(np.all(np.asarray(self.planned_contact, dtype=int) == 1))
+            rear_all_contact_posture_needed = bool(
+                (
+                    float(getattr(self, 'rear_all_contact_stabilization_min_rear_load_share', 0.0)) > 1e-9
+                    and float(rear_load_share) + 1e-12
+                    < float(getattr(self, 'rear_all_contact_stabilization_min_rear_load_share', 0.0))
+                )
+                or (
+                    float(getattr(self, 'rear_all_contact_stabilization_min_rear_leg_load_share', 0.0)) > 1e-9
+                    and float(weak_rear_leg_load_share) + 1e-12
+                    < float(getattr(self, 'rear_all_contact_stabilization_min_rear_leg_load_share', 0.0))
+                )
+                or (
+                    float(getattr(self, 'rear_all_contact_stabilization_height_ratio', 0.0)) > 1e-9
+                    and float(height_ratio)
+                    <= float(getattr(self, 'rear_all_contact_stabilization_height_ratio', 0.0))
+                )
+                or (
+                    np.isfinite(getattr(self, 'rear_all_contact_stabilization_roll_threshold', np.inf))
+                    and float(roll_mag)
+                    >= float(getattr(self, 'rear_all_contact_stabilization_roll_threshold', np.inf))
+                )
+                or (
+                    np.isfinite(getattr(self, 'rear_all_contact_stabilization_pitch_threshold', np.inf))
+                    and float(pitch_mag)
+                    >= float(getattr(self, 'rear_all_contact_stabilization_pitch_threshold', np.inf))
+                )
+            )
+            rear_all_contact_post_recovery_tail_hold_s = float(
+                getattr(self, 'rear_all_contact_post_recovery_tail_hold_s', 0.0)
+            )
+            rear_all_contact_release_tail_trigger = bool(
+                self.gait_name == 'crawl'
+                and float(prev_rear_all_contact_alpha) > 1e-9
+                and float(rear_all_contact_alpha) <= 1e-9
+                and all_contact_now
+                and planned_all_contact_now
+                and bool(int(self.touchdown_settle_active[leg_id]) == 1)
+                and rear_all_contact_posture_needed
+            )
+            if rear_all_contact_post_recovery_tail_hold_s > 1e-9:
+                rear_all_contact_post_recovery_trigger = bool(
+                    self.gait_name == 'crawl'
+                    and prev_full_contact_recovery_active
+                    and int(self.full_contact_recovery_active) == 0
+                    and all_contact_now
+                    and planned_all_contact_now
+                    and rear_all_contact_posture_needed
+                )
+                planted_front_recovery_rearm_trigger_s = float(
+                    getattr(self, 'crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)
+                )
+                front_planted_late_mask = (
+                    (np.asarray(self.planned_contact[0:2], dtype=int) == 0)
+                    & (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                    & (actual_contact_array[0:2] == 1)
+                )
+                rear_contacts_stable_now = bool(
+                    np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                    and np.all(actual_contact_array[2:4] == 1)
+                )
+                planted_front_recovery_near_expiry_now = bool(
+                    (
+                        prev_full_contact_recovery_active
+                        and int(self.full_contact_recovery_active) == 0
+                    )
+                    or (
+                        (prev_full_contact_recovery_active or float(self.full_contact_recovery_remaining_s) > 1e-9)
+                        and (
+                            planted_front_recovery_rearm_trigger_s <= 1e-9
+                            or float(self.full_contact_recovery_remaining_s)
+                            <= planted_front_recovery_rearm_trigger_s + 1e-12
+                        )
+                    )
+                )
+                front_planted_posture_bad = bool(
+                    (
+                        float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
+                        and float(height_ratio)
+                        <= float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0))
+                    )
+                    or (
+                        getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', None) is not None
+                        and np.isfinite(float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0)))
+                        and float(roll_mag)
+                        >= float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0))
+                    )
+                )
+                front_planted_posture_tail_trigger = bool(
+                    self.gait_name == 'crawl'
+                    and rear_all_contact_posture_needed
+                    and rear_contacts_stable_now
+                    and np.count_nonzero(front_planted_late_mask) == 1
+                    and planted_front_recovery_near_expiry_now
+                    and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                    and np.any(
+                        front_planted_late_mask
+                        & (
+                            front_support_margins
+                            <= float(
+                                getattr(
+                                    self,
+                                    'crawl_front_planted_swing_recovery_margin_threshold',
+                                    0.0,
+                                )
+                            )
+                        )
+                    )
+                )
+                self.front_planted_posture_tail_trigger_debug = int(
+                    bool(front_planted_posture_tail_trigger)
+                )
+                front_late_posture_tail_trigger = bool(
+                    self.gait_name == 'crawl'
+                    and (
+                        front_late_posture_tail_candidate
+                        or front_planted_posture_tail_candidate
+                        or front_planted_posture_tail_trigger
+                    )
+                    and rear_all_contact_posture_needed
+                )
+                self.front_late_posture_tail_trigger_debug = int(bool(front_late_posture_tail_trigger))
+                if (
+                    rear_all_contact_post_recovery_trigger
+                    or front_late_posture_tail_trigger
+                    or rear_all_contact_release_tail_trigger
+                ):
+                    tail_alpha_scale = 1.0
+                    if rear_all_contact_release_tail_trigger:
+                        tail_alpha_scale = float(
+                            getattr(self, 'rear_all_contact_release_tail_alpha_scale', 1.0)
+                        )
+                    elif (
+                        front_late_posture_tail_trigger
+                        and not rear_all_contact_post_recovery_trigger
+                        and not rear_all_contact_release_tail_trigger
+                    ):
+                        tail_alpha_scale = float(
+                            getattr(
+                                self,
+                                'rear_all_contact_post_recovery_front_late_alpha_scale',
+                                1.0,
+                            )
+                        )
+                    self.rear_all_contact_post_recovery_alpha_scale = float(
+                        np.clip(tail_alpha_scale, 0.0, 1.0)
+                    )
+                    self.rear_all_contact_post_recovery_remaining_s = max(
+                        float(self.rear_all_contact_post_recovery_remaining_s),
+                        rear_all_contact_post_recovery_tail_hold_s,
+                    )
+                if front_planted_posture_tail_trigger:
+                    self.rear_all_contact_front_planted_tail_alpha_scale = float(
+                        np.clip(
+                            getattr(
+                                self,
+                                'rear_all_contact_post_recovery_front_late_alpha_scale',
+                                1.0,
+                            ),
+                            0.0,
+                            1.0,
+                        )
+                    )
+                    self.rear_all_contact_front_planted_tail_remaining_s = max(
+                        float(self.rear_all_contact_front_planted_tail_remaining_s),
+                        rear_all_contact_post_recovery_tail_hold_s,
+                    )
+                elif float(self.rear_all_contact_front_planted_tail_remaining_s) > 1e-9:
+                    self.rear_all_contact_front_planted_tail_remaining_s = max(
+                        0.0,
+                        float(self.rear_all_contact_front_planted_tail_remaining_s) - float(simulation_dt),
+                    )
+                else:
+                    self.rear_all_contact_front_planted_tail_remaining_s = 0.0
+                    self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
+                if float(self.rear_all_contact_front_planted_tail_remaining_s) > 1e-9:
+                    self.rear_all_contact_front_planted_tail_alpha = float(
+                        np.clip(
+                            float(self.rear_all_contact_front_planted_tail_alpha_scale)
+                            * float(self.rear_all_contact_front_planted_tail_remaining_s)
+                            / max(rear_all_contact_post_recovery_tail_hold_s, 1e-6),
+                            0.0,
+                            1.0,
+                        )
+                    )
+                else:
+                    self.rear_all_contact_front_planted_tail_alpha = 0.0
+                front_planted_seam_support_hold_s = float(
+                    getattr(self, 'crawl_front_planted_seam_support_hold_s', 0.0)
+                )
+                if front_planted_seam_support_hold_s > 1e-9:
+                    front_planted_post_recovery_drop_now = bool(
+                        prev_full_contact_recovery_active
+                        and int(self.full_contact_recovery_active) == 0
+                    )
+                    front_planted_seam_support_trigger = bool(
+                        self.gait_name == 'crawl'
+                        and front_planted_post_recovery_drop_now
+                        and int(self.full_contact_recovery_active) == 0
+                        and float(rear_all_contact_alpha) <= 1e-9
+                        and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+                        and rear_contacts_stable_now
+                        and np.count_nonzero(front_planted_late_mask) == 1
+                        and front_planted_posture_bad
+                        and np.any(
+                            front_planted_late_mask
+                            & (
+                                front_support_margins
+                                <= float(
+                                    getattr(
+                                        self,
+                                        'crawl_front_planted_swing_recovery_margin_threshold',
+                                        0.0,
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    if front_planted_seam_support_trigger:
+                        self.crawl_front_planted_seam_support_remaining_s = max(
+                            float(self.crawl_front_planted_seam_support_remaining_s),
+                            front_planted_seam_support_hold_s,
+                        )
+                    elif float(self.crawl_front_planted_seam_support_remaining_s) > 1e-9:
+                        self.crawl_front_planted_seam_support_remaining_s = max(
+                            0.0,
+                            float(self.crawl_front_planted_seam_support_remaining_s) - float(simulation_dt),
+                        )
+                    else:
+                        self.crawl_front_planted_seam_support_remaining_s = 0.0
+                    if float(self.crawl_front_planted_seam_support_remaining_s) > 1e-9:
+                        self.crawl_front_planted_seam_support_alpha = float(
+                            np.clip(
+                                float(self.crawl_front_planted_seam_support_remaining_s)
+                                / max(front_planted_seam_support_hold_s, 1e-6),
+                                0.0,
+                                1.0,
+                            )
+                        )
+                        if bool(getattr(self, 'crawl_front_planted_seam_keep_swing', False)):
+                            front_planted_seam_keep_swing_mask = np.asarray(
+                                front_planted_late_mask,
+                                dtype=bool,
+                            ).copy()
+                    else:
+                        self.crawl_front_planted_seam_support_alpha = 0.0
+                else:
+                    self.crawl_front_planted_seam_support_remaining_s = 0.0
+                    self.crawl_front_planted_seam_support_alpha = 0.0
+                if (
+                    rear_all_contact_post_recovery_trigger
+                    or front_late_posture_tail_trigger
+                    or rear_all_contact_release_tail_trigger
+                ):
+                    pass
+                elif float(self.rear_all_contact_post_recovery_remaining_s) > 1e-9:
+                    self.rear_all_contact_post_recovery_remaining_s = max(
+                        0.0,
+                        float(self.rear_all_contact_post_recovery_remaining_s) - float(simulation_dt),
+                    )
+                else:
+                    self.rear_all_contact_post_recovery_remaining_s = 0.0
+                if float(self.rear_all_contact_post_recovery_remaining_s) > 1e-9:
+                    # Keep a short, decaying posture-only tail after late full-contact
+                    # recovery drops out. This preserves the rear all-contact height/roll
+                    # shaping in the linear force path without re-extending the broader
+                    # touchdown/recovery support windows that tend to suppress the next
+                    # front swing.
+                    rear_all_contact_alpha = max(
+                        float(rear_all_contact_alpha),
+                        float(
+                                np.clip(
+                                float(self.rear_all_contact_post_recovery_alpha_scale)
+                                * float(self.rear_all_contact_post_recovery_remaining_s)
+                                / max(rear_all_contact_post_recovery_tail_hold_s, 1e-6),
+                                0.0,
+                                1.0,
+                            )
+                        ),
+                    )
+            else:
+                self.rear_all_contact_post_recovery_remaining_s = 0.0
+                self.rear_all_contact_post_recovery_alpha_scale = 1.0
+                self.rear_all_contact_front_planted_tail_remaining_s = 0.0
+                self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
+                self.rear_all_contact_front_planted_tail_alpha = 0.0
+                self.crawl_front_planted_seam_support_remaining_s = 0.0
+                self.crawl_front_planted_seam_support_alpha = 0.0
+            full_contact_recovery_allcontact_release_tail_s = float(
+                getattr(self, 'full_contact_recovery_allcontact_release_tail_s', 0.0)
+            )
+            if full_contact_recovery_allcontact_release_tail_s > 1e-9:
+                rear_transition_clear_now = bool(
+                    np.all(np.asarray(contact_sequence[2:4, 0], dtype=int) == 1)
+                    and np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                    and np.all(actual_contact_array[2:4] == 1)
+                    and int(self.rear_handoff_support_active) == 0
+                    and int(self.rear_swing_bridge_active) == 0
+                    and int(self.rear_swing_release_support_active) == 0
+                    and float(self.rear_close_handoff_alpha) <= 1e-9
+                    and (not np.any(np.asarray(self.touchdown_reacquire_active[2:4], dtype=int) == 1))
+                    and (not np.any(np.asarray(self.touchdown_confirm_active[2:4], dtype=int) == 1))
+                    and (not np.any(np.asarray(self.touchdown_settle_active[2:4], dtype=int) == 1))
+                    and (not np.any(np.asarray(self.touchdown_support_active[2:4], dtype=int) == 1))
+                    and float(rear_all_contact_alpha) <= 1e-9
+                )
+                if (
+                    self.gait_name == 'crawl'
+                    and all_contact_now
+                    and planned_all_contact_now
+                    and rear_transition_clear_now
+                    and float(self.full_contact_recovery_remaining_s)
+                    > full_contact_recovery_allcontact_release_tail_s
+                ):
+                    self.full_contact_recovery_remaining_s = min(
+                        float(self.full_contact_recovery_remaining_s),
+                        full_contact_recovery_allcontact_release_tail_s,
+                    )
+            front_stance_support_tail_hold_s = float(
+                getattr(self, 'crawl_front_stance_support_tail_hold_s', 0.0)
+            )
+            front_stance_release_tail_trigger = bool(
+                self.gait_name == 'crawl'
+                and float(front_stance_support_tail_hold_s) > 1e-9
+                and rear_all_contact_release_tail_trigger
+                and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+            )
+            if front_stance_release_tail_trigger:
+                self.crawl_front_stance_support_tail_remaining_s = max(
+                    float(self.crawl_front_stance_support_tail_remaining_s),
+                    float(front_stance_support_tail_hold_s),
+                )
+            self.rear_all_contact_weak_leg_alpha = 0.0
+            self.rear_all_contact_weak_leg_index = -1
+            weak_leg_share_ref = float(
+                getattr(self, 'rear_all_contact_stabilization_weak_leg_share_ref', 0.0)
+            )
+            weak_leg_height_ratio = float(
+                getattr(self, 'rear_all_contact_stabilization_weak_leg_height_ratio', 0.0)
+            )
+            weak_leg_tail_only = bool(
+                getattr(self, 'rear_all_contact_stabilization_weak_leg_tail_only', False)
+            )
+            weak_leg_post_recovery_tail_active = bool(
+                float(getattr(self, 'rear_all_contact_post_recovery_remaining_s', 0.0)) > 1e-9
+            )
+            weak_leg_late_recovery_only_active = bool(
+                self.gait_name == 'crawl'
+                and int(self.full_contact_recovery_active) == 1
+                and float(rear_all_contact_alpha) <= 1e-9
+                and all_contact_now
+                and planned_all_contact_now
+            )
+            # Keep the dedicated weak-leg rear-floor assist narrowly scoped.
+            # The broader "late recovery only" window helped earlier all-contact
+            # cycles too aggressively and shortened the run before the final
+            # low-height seam. When tail-only mode is requested, treat it as a
+            # true post-recovery rear-all-contact tail rather than as a general
+            # full-contact-recovery extension.
+            weak_leg_tail_active = bool(
+                weak_leg_post_recovery_tail_active
+                if weak_leg_tail_only
+                else (weak_leg_post_recovery_tail_active or weak_leg_late_recovery_only_active)
+            )
+            weak_leg_height_ok = bool(
+                weak_leg_height_ratio <= 1e-9
+                or float(height_ratio) <= weak_leg_height_ratio
+            )
+            weak_leg_support_alpha_source = float(rear_all_contact_alpha)
+            if (not weak_leg_tail_only) and weak_leg_late_recovery_only_active:
+                weak_leg_support_alpha_source = max(
+                    float(weak_leg_support_alpha_source),
+                    float(getattr(self, 'full_contact_recovery_alpha', 0.0)),
+                )
+            if (
+                self.gait_name == 'crawl'
+                and float(weak_leg_support_alpha_source) > 1e-9
+                and weak_leg_share_ref > 1e-9
+                and all_contact_now
+                and planned_all_contact_now
+                and weak_leg_height_ok
+                and ((not weak_leg_tail_only) or weak_leg_tail_active)
+            ):
+                weak_rear_leg_local_idx = int(np.argmin(rear_pair_leg_shares))
+                weak_rear_leg_id = int(2 + weak_rear_leg_local_idx)
+                weak_rear_leg_share_deficit_alpha = float(
+                    np.clip(
+                        (weak_leg_share_ref - float(weak_rear_leg_load_share))
+                        / max(weak_leg_share_ref, 0.20),
+                        0.0,
+                        1.0,
+                    )
+                )
+                if (
+                    weak_rear_leg_share_deficit_alpha > 1e-9
+                    and bool(actual_contact[weak_rear_leg_id])
+                    and bool(int(self.current_contact[weak_rear_leg_id]) == 1)
+                    and bool(int(self.planned_contact[weak_rear_leg_id]) == 1)
+                ):
+                    weak_leg_activation_alpha = float(
+                        float(weak_leg_support_alpha_source) * weak_rear_leg_share_deficit_alpha
+                    )
+                    if weak_leg_tail_only:
+                        # In the narrow post-recovery tail we want the targeted
+                        # weak-leg assist to be strong enough to matter before
+                        # the low-height rear seam closes again. The old
+                        # source*deficit product was too small and made even
+                        # large floor-delta sweeps numerically inert.
+                        weak_leg_activation_alpha = float(
+                            np.clip(
+                                float(weak_leg_support_alpha_source)
+                                * max(
+                                    weak_rear_leg_share_deficit_alpha,
+                                    float(
+                                        np.clip(
+                                            weak_rear_leg_share_deficit_alpha / 0.10,
+                                            0.0,
+                                            1.0,
+                                        )
+                                    ),
+                                ),
+                                0.0,
+                                1.0,
+                            )
+                        )
+                    self.rear_all_contact_weak_leg_alpha = float(
+                        np.clip(weak_leg_activation_alpha, 0.0, 1.0)
+                    )
+                    self.rear_all_contact_weak_leg_index = int(weak_rear_leg_id)
+            front_planted_weak_share_ref = float(
+                getattr(self, 'crawl_front_planted_weak_rear_share_ref', 0.0)
+            )
+            if (
+                self.gait_name == 'crawl'
+                and float(self.rear_all_contact_weak_leg_alpha) <= 1e-9
+                and front_planted_weak_share_ref > 1e-9
+                and int(self.full_contact_recovery_active) == 0
+                and float(rear_all_contact_alpha) <= 1e-9
+                and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
+            ):
+                front_planted_late_mask = (
+                    (np.asarray(self.planned_contact[0:2], dtype=int) == 0)
+                    & (np.asarray(self.current_contact[0:2], dtype=int) == 1)
+                    & (actual_contact_array[0:2] == 1)
+                )
+                rear_contacts_stable_for_front_planted = bool(
+                    np.all(np.asarray(self.current_contact[2:4], dtype=int) == 1)
+                    and np.all(actual_contact_array[2:4] == 1)
+                )
+                front_planted_support_margin_ok = bool(
+                    np.any(
+                        front_planted_late_mask
+                        & (
+                            front_support_margins
+                            <= float(
+                                getattr(
+                                    self,
+                                    'crawl_front_planted_swing_recovery_margin_threshold',
+                                    0.0,
+                                )
+                            )
+                        )
+                    )
+                )
+                front_planted_posture_bad = bool(
+                    (
+                        float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
+                        and float(height_ratio)
+                        <= float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0))
+                    )
+                    or (
+                        getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', None) is not None
+                        and np.isfinite(float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0)))
+                        and float(roll_mag)
+                        >= float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0))
+                    )
+                )
+                if (
+                    np.count_nonzero(front_planted_late_mask) == 1
+                    and rear_contacts_stable_for_front_planted
+                    and front_planted_support_margin_ok
+                    and front_planted_posture_bad
+                ):
+                    weak_rear_leg_local_idx = int(np.argmin(rear_pair_leg_shares))
+                    weak_rear_leg_id = int(2 + weak_rear_leg_local_idx)
+                    weak_rear_leg_share_deficit_alpha = float(
+                        np.clip(
+                            (front_planted_weak_share_ref - float(weak_rear_leg_load_share))
+                            / max(front_planted_weak_share_ref, 0.20),
+                            0.0,
+                            1.0,
+                        )
+                    )
+                    if (
+                        weak_rear_leg_share_deficit_alpha > 1e-9
+                        and bool(actual_contact[weak_rear_leg_id])
+                        and bool(int(self.current_contact[weak_rear_leg_id]) == 1)
+                        and bool(int(self.planned_contact[weak_rear_leg_id]) == 1)
+                    ):
+                        front_recent_alpha = float(
+                            np.clip(
+                                float(self.front_touchdown_support_recent_remaining_s)
+                                / max(float(self.full_contact_recovery_recent_window_s), 1e-6),
+                                0.0,
+                                1.0,
+                            )
+                        )
+                        front_planted_weak_alpha = float(
+                            np.clip(
+                                front_recent_alpha
+                                * max(
+                                    weak_rear_leg_share_deficit_alpha,
+                                    float(
+                                        np.clip(
+                                            weak_rear_leg_share_deficit_alpha / 0.10,
+                                            0.0,
+                                            1.0,
+                                        )
+                                    ),
+                                ),
+                                0.0,
+                                float(getattr(self, 'crawl_front_planted_weak_rear_alpha_cap', 1.0)),
+                            )
+                        )
+                        self.rear_all_contact_weak_leg_alpha = float(front_planted_weak_alpha)
+                        self.rear_all_contact_weak_leg_index = int(weak_rear_leg_id)
+            self.touchdown_support_alpha = float(support_alpha)
+            self.front_touchdown_support_alpha = float(front_support_alpha)
+            self.rear_touchdown_support_alpha = float(rear_support_alpha)
+            self.rear_all_contact_stabilization_alpha = float(rear_all_contact_alpha)
             self._sync_rear_transition_debug_arrays()
             if float(self.full_contact_recovery_recent_window_s) > 1e-9:
-                if front_support_alpha > 1e-9:
+                steady_all_contact_hold = bool(
+                    all_contact_now
+                    and planned_all_contact_now
+                    and float(rear_all_contact_alpha) <= 1e-9
+                    and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+                )
+                if front_support_alpha > 1e-9 and (not steady_all_contact_hold):
                     self.front_touchdown_support_recent_remaining_s = float(self.full_contact_recovery_recent_window_s)
                 else:
                     self.front_touchdown_support_recent_remaining_s = max(
@@ -3050,6 +4544,29 @@ class WBInterface:
                     )
             else:
                 self.front_touchdown_support_recent_remaining_s = 0.0
+            post_recovery_guard_hold_s = float(
+                getattr(self, 'front_rear_transition_guard_post_recovery_hold_s', 0.0)
+            )
+            if post_recovery_guard_hold_s > 1e-9:
+                post_recovery_guard_trigger = bool(
+                    self.gait_name == 'crawl'
+                    and (
+                        (prev_full_contact_recovery_active and int(self.full_contact_recovery_active) == 0)
+                        or (float(prev_rear_all_contact_alpha) > 1e-9 and float(rear_all_contact_alpha) <= 1e-9)
+                    )
+                )
+                if post_recovery_guard_trigger:
+                    self.front_rear_transition_guard_post_recovery_remaining_s = max(
+                        float(self.front_rear_transition_guard_post_recovery_remaining_s),
+                        post_recovery_guard_hold_s,
+                    )
+                else:
+                    self.front_rear_transition_guard_post_recovery_remaining_s = max(
+                        0.0,
+                        float(self.front_rear_transition_guard_post_recovery_remaining_s) - float(simulation_dt),
+                    )
+            else:
+                self.front_rear_transition_guard_post_recovery_remaining_s = 0.0
 
             self.last_gate_forward_scale = float(gate_forward_scale)
             if cfg.mpc_params['type'] == 'linear_osqp' and gate_forward_scale < 0.999:
@@ -3059,7 +4576,12 @@ class WBInterface:
         if cfg.mpc_params['type'] == 'linear_osqp' and self.rear_touchdown_reacquire_force_until_contact:
             for leg_id in range(2, 4):
                 planned_stance = bool(int(self.planned_contact[leg_id]) == 1)
-                waiting_for_recontact = bool(int(self.touchdown_reacquire_armed[leg_id]) == 1)
+                waiting_for_recontact = self._rear_waiting_for_recontact(
+                    leg_id,
+                    planned_stance=planned_stance,
+                    actual_contact=actual_contact,
+                    prev_reacquire_active=prev_touchdown_reacquire_active,
+                )
                 current_foot_vz = float(approx_feet_vel_world[leg_id, 2])
                 swing_phase = float(self.stc.swing_time[leg_id]) / max(float(self.stc.swing_period), 1e-6)
                 rear_contact_ready = self._rear_touchdown_contact_ready(
@@ -3080,13 +4602,50 @@ class WBInterface:
                     if ready_for_reacquire:
                         self.touchdown_reacquire_active[leg_id] = 1
 
+        for leg_id in range(2, 4):
+            remaining_s = float(self.rear_touchdown_close_lock_remaining_s[leg_id])
+            if remaining_s <= 1e-9 or float(self.rear_touchdown_close_lock_hold_s) <= 1e-9:
+                self.rear_touchdown_close_lock_remaining_s[leg_id] = 0.0
+                continue
+            if bool(actual_contact[leg_id]):
+                contact_sequence[leg_id][0] = 1
+                self.rear_touchdown_close_lock_remaining_s[leg_id] = max(
+                    0.0,
+                    remaining_s - float(simulation_dt),
+                )
+            else:
+                self.rear_touchdown_close_lock_remaining_s[leg_id] = 0.0
+
+        if self.gait_name == 'crawl' and np.any(front_close_gap_keep_swing_mask):
+            for leg_id in range(2):
+                if not bool(front_close_gap_keep_swing_mask[leg_id]):
+                    continue
+                # When a front leg has already re-closed planned/current stance
+                # but MuJoCo contact has not yet returned, keep the controller on
+                # the swing side for one more control beat so the leg continues
+                # descending instead of switching to stance too early.
+                contact_sequence[leg_id][0] = 0
+
+        if self.gait_name == 'crawl' and np.any(front_planted_seam_keep_swing_mask):
+            for leg_id in range(2):
+                if not bool(front_planted_seam_keep_swing_mask[leg_id]):
+                    continue
+                # After late full-contact recovery drops, a front leg can remain
+                # physically planted even though it is already planned swing.
+                # Keep that leg on the controller swing side for the short seam
+                # tail so lift-off keeps progressing instead of re-latching
+                # stance through the final low-height collapse window.
+                contact_sequence[leg_id][0] = 0
+
         self.previous_contact = copy.deepcopy(self.current_contact)
         self.current_contact = np.array(
             [contact_sequence[0][0], contact_sequence[1][0], contact_sequence[2][0], contact_sequence[3][0]]
         )
+        all_actual_contact_now = bool(np.all(np.asarray(actual_contact, dtype=int) == 1))
         for leg_id in range(2, 4):
             if int(self.planned_contact[leg_id]) == 0:
                 self.rear_touchdown_retry_count[leg_id] = 0
+                self.rear_close_handoff_remaining_s[leg_id] = 0.0
                 continue
             if int(self.previous_contact[leg_id]) == 1 and int(self.current_contact[leg_id]) == 0:
                 # This is a rear planned-stance reopen after a flaky first close.
@@ -3095,6 +4654,265 @@ class WBInterface:
                 self.rear_touchdown_retry_count[leg_id] += 1
             elif int(self.current_contact[leg_id]) == 1 and bool(actual_contact[leg_id]):
                 self.rear_touchdown_retry_count[leg_id] = 0
+            close_after_late_actual_contact = bool(
+                self.gait_name == 'crawl'
+                and float(self.rear_close_handoff_hold_s) > 1e-9
+                and int(self.previous_contact[leg_id]) == 0
+                and int(self.current_contact[leg_id]) == 1
+                and int(self.planned_contact[leg_id]) == 1
+                and bool(actual_contact[leg_id])
+                and bool(self.previous_actual_contact[leg_id])
+                and all_actual_contact_now
+            )
+            if close_after_late_actual_contact:
+                self.rear_close_handoff_remaining_s[leg_id] = max(
+                    float(self.rear_close_handoff_remaining_s[leg_id]),
+                    float(self.rear_close_handoff_hold_s),
+                )
+                self.rear_close_handoff_alpha_scale[leg_id] = max(
+                    float(self.rear_close_handoff_alpha_scale[leg_id]),
+                    1.0,
+                )
+            if not (
+                int(self.current_contact[leg_id]) == 1
+                and int(self.planned_contact[leg_id]) == 1
+                and bool(actual_contact[leg_id])
+            ):
+                self.rear_close_handoff_remaining_s[leg_id] = 0.0
+                self.rear_close_handoff_alpha_scale[leg_id] = 0.0
+        self.rear_close_handoff_alpha = 0.0
+        self.rear_close_handoff_leg_index = -1
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
+        late_load_share_hold_s = float(
+            getattr(self, 'rear_late_load_share_support_hold_s', 0.0)
+        )
+        if not hasattr(self, 'rear_close_handoff_alpha_scale'):
+            self.rear_close_handoff_alpha_scale = np.zeros(4, dtype=float)
+        if not hasattr(self, 'rear_late_load_share_remaining_s'):
+            self.rear_late_load_share_remaining_s = np.zeros(4, dtype=float)
+        if not hasattr(self, 'rear_late_load_share_trigger_elapsed_s'):
+            self.rear_late_load_share_trigger_elapsed_s = np.zeros(4, dtype=float)
+        if not hasattr(self, 'rear_late_load_share_alpha_scale'):
+            self.rear_late_load_share_alpha_scale = np.zeros(4, dtype=float)
+        self.rear_late_load_share_active_debug[:] = 0
+        self.rear_late_load_share_alpha_debug[:] = 0.0
+        self.rear_late_load_share_candidate_active_debug[:] = 0
+        self.rear_late_load_share_candidate_alpha_debug[:] = 0.0
+        self.rear_late_load_share_trigger_enabled_debug = 0
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
+        if late_load_share_hold_s > 1e-9:
+            front_planted_support_window_active = bool(
+                float(getattr(self, 'rear_all_contact_front_planted_tail_alpha', 0.0)) > 1e-9
+                or float(getattr(self, 'crawl_front_planted_seam_support_alpha', 0.0)) > 1e-9
+            )
+            late_load_share_trigger_enabled = bool(
+                self.gait_name == 'crawl'
+                and all_actual_contact_now
+                and bool(np.all(np.asarray(self.planned_contact, dtype=int) == 1))
+                and (
+                    float(getattr(self, 'full_contact_recovery_active', 0.0)) > 0.5
+                    or front_planted_support_window_active
+                )
+                and float(height_ratio)
+                <= float(getattr(self, 'rear_late_load_share_support_height_ratio', 0.0))
+                and rear_all_contact_posture_needed
+            )
+            self.rear_late_load_share_trigger_enabled_debug = int(late_load_share_trigger_enabled)
+            late_load_share_candidate_active = np.zeros(4, dtype=int)
+            late_load_share_candidate_alpha = np.zeros(4, dtype=float)
+            if late_load_share_trigger_enabled:
+                rear_vertical_grf = np.asarray(
+                    [float(vertical_grf[2]), float(vertical_grf[3])],
+                    dtype=float,
+                )
+                rear_total_vertical_grf = float(np.sum(rear_vertical_grf))
+                if rear_total_vertical_grf > 1e-6:
+                    # The late crawl collapse is driven more by left/right
+                    # rear-pair imbalance than by total rear load alone.
+                    rear_leg_shares = rear_vertical_grf / rear_total_vertical_grf
+                    active_local_ids = np.flatnonzero(
+                        np.asarray(self.rear_late_load_share_remaining_s[2:4], dtype=float) > 1e-9
+                    )
+                    if active_local_ids.size == 1:
+                        # Once the late asymmetric rear support path is already
+                        # active for one hind leg, keep that same leg latched
+                        # until the window retires instead of letting the weak
+                        # side bounce back and forth between RL/RR.
+                        weak_local_idx = int(active_local_ids[0])
+                    elif active_local_ids.size >= 2:
+                        weak_local_idx = int(
+                            active_local_ids[
+                                np.argmax(
+                                    np.asarray(
+                                        self.rear_late_load_share_remaining_s[2:4],
+                                        dtype=float,
+                                    )[active_local_ids]
+                                )
+                            ]
+                        )
+                    else:
+                        weak_local_idx = int(np.argmin(rear_leg_shares))
+                    weak_leg_id = int(2 + weak_local_idx)
+                    weak_leg_share = float(rear_leg_shares[weak_local_idx])
+                    if (
+                        weak_leg_share + 1e-12
+                        < float(getattr(self, 'rear_late_load_share_support_min_leg_share', 0.0))
+                        and bool(actual_contact[weak_leg_id])
+                        and bool(int(self.current_contact[weak_leg_id]) == 1)
+                        and bool(int(self.planned_contact[weak_leg_id]) == 1)
+                    ):
+                        # Allow this asymmetric leg-floor boost to coexist with
+                        # the broader rear all-contact support path. The global
+                        # rear-floor raise helps the whole hind pair, while this
+                        # targeted alpha is intended to push extra load into the
+                        # clearly under-sharing rear leg that still causes the
+                        # late left/right roll collapse.
+                        weak_leg_share_threshold = float(
+                            getattr(self, 'rear_late_load_share_support_min_leg_share', 0.0)
+                        )
+                        # Scale the late asymmetric handoff by how clearly the
+                        # weak rear leg is under-sharing load instead of
+                        # immediately applying a full-strength override after a
+                        # single threshold crossing.
+                        weak_leg_share_deficit_alpha = float(
+                            np.clip(
+                                (weak_leg_share_threshold - weak_leg_share)
+                                / max(weak_leg_share_threshold, 0.20),
+                                0.0,
+                                1.0,
+                            )
+                        )
+                        late_load_share_candidate_active[weak_leg_id] = 1
+                        late_load_share_candidate_alpha[weak_leg_id] = float(
+                            np.clip(
+                                weak_leg_share_deficit_alpha,
+                                0.0,
+                                float(
+                                    getattr(
+                                        self,
+                                        'rear_late_load_share_support_alpha_cap',
+                                        1.0,
+                                    )
+                                ),
+                            )
+                        )
+            self.rear_late_load_share_candidate_active_debug[:] = late_load_share_candidate_active.astype(int)
+            self.rear_late_load_share_candidate_alpha_debug[:] = late_load_share_candidate_alpha.astype(float)
+            for leg_id in range(2, 4):
+                if int(late_load_share_candidate_active[leg_id]) == 1:
+                    self.rear_late_load_share_trigger_elapsed_s[leg_id] = min(
+                        float(self.rear_late_load_share_trigger_elapsed_s[leg_id]) + float(simulation_dt),
+                        max(
+                            float(getattr(self, 'rear_late_load_share_support_min_persist_s', 0.0)),
+                            late_load_share_hold_s,
+                            float(simulation_dt),
+                        ),
+                    )
+                else:
+                    self.rear_late_load_share_trigger_elapsed_s[leg_id] = 0.0
+                min_persist_s = float(
+                    getattr(self, 'rear_late_load_share_support_min_persist_s', 0.0)
+                )
+                if (
+                    int(late_load_share_candidate_active[leg_id]) == 1
+                    and float(self.rear_late_load_share_trigger_elapsed_s[leg_id]) + 1e-12
+                    >= max(min_persist_s, float(simulation_dt))
+                ):
+                    # Keep a dedicated weaker-leg crawl support window alive
+                    # without re-arming the broader rear close-handoff path.
+                    # The earlier shared path improved observability but ended
+                    # up overextending the targeted rear handoff and regressed
+                    # the long-horizon crawl baseline.
+                    self.rear_late_load_share_remaining_s[leg_id] = max(
+                        float(self.rear_late_load_share_remaining_s[leg_id]),
+                        late_load_share_hold_s,
+                    )
+                    self.rear_late_load_share_alpha_scale[leg_id] = max(
+                        float(self.rear_late_load_share_alpha_scale[leg_id]),
+                        float(late_load_share_candidate_alpha[leg_id]),
+                    )
+                remaining_s = float(self.rear_late_load_share_remaining_s[leg_id])
+                if remaining_s <= 1e-9:
+                    self.rear_late_load_share_remaining_s[leg_id] = 0.0
+                    self.rear_late_load_share_alpha_scale[leg_id] = 0.0
+                    # Keep the trigger elapsed timer intact here so a weak-leg
+                    # candidate can accumulate persistence before the support
+                    # window is first armed.
+                    continue
+                if (
+                    not bool(actual_contact[leg_id])
+                    or not bool(int(self.current_contact[leg_id]) == 1)
+                    or not bool(int(self.planned_contact[leg_id]) == 1)
+                ):
+                    self.rear_late_load_share_remaining_s[leg_id] = 0.0
+                    self.rear_late_load_share_alpha_scale[leg_id] = 0.0
+                    self.rear_late_load_share_trigger_elapsed_s[leg_id] = 0.0
+                    continue
+                time_alpha = float(
+                    np.clip(
+                        remaining_s / max(late_load_share_hold_s, 1e-6),
+                        0.0,
+                        1.0,
+                    )
+                )
+                alpha = float(
+                    np.clip(
+                        time_alpha * float(self.rear_late_load_share_alpha_scale[leg_id]),
+                        0.0,
+                        1.0,
+                    )
+                )
+                self.rear_late_load_share_active_debug[leg_id] = int(alpha > 1e-9)
+                self.rear_late_load_share_alpha_debug[leg_id] = float(alpha)
+                if alpha > float(self.rear_late_load_share_alpha):
+                    self.rear_late_load_share_alpha = alpha
+                    self.rear_late_load_share_leg_index = int(leg_id)
+                self.rear_late_load_share_remaining_s[leg_id] = max(
+                    0.0,
+                    remaining_s - float(simulation_dt),
+                )
+        else:
+            self.rear_late_load_share_remaining_s[:] = 0.0
+            self.rear_late_load_share_trigger_elapsed_s[:] = 0.0
+            self.rear_late_load_share_alpha_scale[:] = 0.0
+            self.rear_late_load_share_candidate_active_debug[:] = 0
+            self.rear_late_load_share_candidate_alpha_debug[:] = 0.0
+            self.rear_late_load_share_trigger_enabled_debug = 0
+        for leg_id in range(2, 4):
+            remaining_s = float(self.rear_close_handoff_remaining_s[leg_id])
+            if remaining_s <= 1e-9 or float(self.rear_close_handoff_hold_s) <= 1e-9:
+                self.rear_close_handoff_remaining_s[leg_id] = 0.0
+                self.rear_close_handoff_alpha_scale[leg_id] = 0.0
+                continue
+            alpha_scale = float(
+                np.clip(
+                    float(self.rear_close_handoff_alpha_scale[leg_id]),
+                    0.0,
+                    1.0,
+                )
+            )
+            alpha = float(
+                np.clip(
+                    (
+                        remaining_s / max(float(self.rear_close_handoff_hold_s), 1e-6)
+                    )
+                    * alpha_scale,
+                    0.0,
+                    1.0,
+                )
+            )
+            self.rear_close_handoff_active_debug[leg_id] = 1
+            if alpha > float(self.rear_close_handoff_alpha):
+                self.rear_close_handoff_alpha = alpha
+                self.rear_close_handoff_leg_index = int(leg_id)
+            self.rear_close_handoff_remaining_s[leg_id] = max(
+                0.0,
+                remaining_s - float(simulation_dt),
+            )
+            if float(self.rear_close_handoff_remaining_s[leg_id]) <= 1e-9:
+                self.rear_close_handoff_alpha_scale[leg_id] = 0.0
         self.previous_actual_contact = np.asarray(actual_contact, dtype=int).copy()
 
         # Compute the reference for the footholds ---------------------------------------------------
@@ -3725,6 +5543,12 @@ class WBInterface:
         self.touchdown_confirm_elapsed_s = np.zeros(4, dtype=float)
         self.touchdown_settle_remaining_s = np.zeros(4, dtype=float)
         self.rear_touchdown_actual_contact_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_late_seam_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_close_handoff_remaining_s = np.zeros(4, dtype=float)
+        self.rear_close_handoff_alpha_scale = np.zeros(4, dtype=float)
+        self.rear_late_load_share_remaining_s = np.zeros(4, dtype=float)
+        self.rear_late_load_share_trigger_elapsed_s = np.zeros(4, dtype=float)
+        self.rear_touchdown_close_lock_remaining_s = np.zeros(4, dtype=float)
         self.rear_touchdown_retry_count = np.zeros(4, dtype=int)
         self.rear_stable_stance_elapsed_s = np.zeros(4, dtype=float)
         self.previous_feet_pos_world = np.stack(
@@ -3754,16 +5578,44 @@ class WBInterface:
         self.touchdown_settle_active = np.zeros(4, dtype=int)
         self.touchdown_support_active = np.zeros(4, dtype=int)
         self.rear_touchdown_pending_confirm = np.zeros(4, dtype=int)
+        self.rear_late_seam_support_active_debug = np.zeros(4, dtype=int)
+        self.rear_close_handoff_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_alpha_debug = np.zeros(4, dtype=float)
+        self.rear_late_load_share_candidate_active_debug = np.zeros(4, dtype=int)
+        self.rear_late_load_share_candidate_alpha_debug = np.zeros(4, dtype=float)
+        self.rear_late_load_share_trigger_enabled_debug = 0
+        self.full_contact_recovery_trigger_debug = 0
+        self.front_delayed_swing_recovery_trigger_debug = 0
+        self.planted_front_recovery_trigger_debug = 0
+        self.planted_front_postdrop_recovery_trigger_debug = 0
+        self.front_close_gap_trigger_debug = 0
+        self.front_late_rearm_trigger_debug = 0
+        self.front_planted_posture_tail_trigger_debug = 0
+        self.front_late_posture_tail_trigger_debug = 0
         self.front_margin_rescue_active = np.zeros(4, dtype=int)
         self.touchdown_support_alpha = 0.0
         self.front_touchdown_support_alpha = 0.0
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
+        self.rear_all_contact_front_planted_tail_alpha = 0.0
+        self.crawl_front_planted_seam_support_alpha = 0.0
+        self.rear_close_handoff_alpha = 0.0
+        self.rear_close_handoff_leg_index = -1
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
         self.touchdown_contact_vel_z_damping = 0.0
         self.front_touchdown_contact_vel_z_damping = 0.0
         self.rear_touchdown_contact_vel_z_damping = 0.0
         self.full_contact_recovery_remaining_s = 0.0
         self.crawl_front_stance_support_tail_remaining_s = 0.0
+        self.crawl_front_planted_seam_support_remaining_s = 0.0
+        self.front_rear_transition_guard_post_recovery_remaining_s = 0.0
+        self.rear_all_contact_front_planted_tail_remaining_s = 0.0
+        self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
+        self.front_delayed_swing_recovery_spent = np.zeros(2, dtype=int)
+        self.front_planted_swing_recovery_spent = np.zeros(2, dtype=int)
+        self.front_late_rearm_used_s = np.zeros(2, dtype=float)
         self.front_touchdown_support_recent_remaining_s = 0.0
         self.rear_swing_bridge_recent_front_remaining_s = 0.0
         self.full_contact_recovery_active = 0
@@ -3771,6 +5623,29 @@ class WBInterface:
         self.last_gate_forward_scale = 1.0
         self.rear_transition_manager.reset()
         self._sync_rear_transition_debug_arrays()
+        self.rear_retry_contact_signal_debug[:] = 0
+        self.rear_touchdown_contact_ready_debug[:] = 0
+        self.rear_late_stance_contact_ready_debug[:] = 0
+        self.rear_all_contact_support_needed_debug[:] = 0
+        self.rear_late_seam_support_active_debug[:] = 0
+        self.rear_close_handoff_active_debug[:] = 0
+        self.rear_late_load_share_active_debug[:] = 0
+        self.rear_late_load_share_alpha_debug[:] = 0.0
+        self.rear_late_load_share_candidate_active_debug[:] = 0
+        self.rear_late_load_share_candidate_alpha_debug[:] = 0.0
+        self.rear_late_load_share_trigger_enabled_debug = 0
+        self.full_contact_recovery_trigger_debug = 0
+        self.front_delayed_swing_recovery_trigger_debug = 0
+        self.planted_front_recovery_trigger_debug = 0
+        self.planted_front_postdrop_recovery_trigger_debug = 0
+        self.front_close_gap_trigger_debug = 0
+        self.front_late_rearm_trigger_debug = 0
+        self.front_planted_posture_tail_trigger_debug = 0
+        self.front_late_posture_tail_trigger_debug = 0
+        self.rear_close_handoff_alpha = 0.0
+        self.rear_close_handoff_leg_index = -1
+        self.rear_late_load_share_alpha = 0.0
+        self.rear_late_load_share_leg_index = -1
         self._refresh_linear_timing_params()
         self.startup_full_stance_elapsed_s = 0.0
         return

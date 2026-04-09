@@ -46,6 +46,7 @@ class RearTransitionManager:
         self.front_transition_guard_roll_threshold = np.inf
         self.front_transition_guard_pitch_threshold = np.inf
         self.front_transition_guard_height_ratio = 0.0
+        self.front_transition_guard_release_tail_s = 0.0
         self.pre_swing_guard_roll_threshold = np.inf
         self.pre_swing_guard_pitch_threshold = np.inf
         self.pre_swing_guard_height_ratio = 0.0
@@ -88,6 +89,7 @@ class RearTransitionManager:
         front_transition_guard_roll_threshold: float | None,
         front_transition_guard_pitch_threshold: float | None,
         front_transition_guard_height_ratio: float,
+        front_transition_guard_release_tail_s: float,
         pre_swing_guard_roll_threshold: float | None,
         pre_swing_guard_pitch_threshold: float | None,
         pre_swing_guard_height_ratio: float,
@@ -160,6 +162,7 @@ class RearTransitionManager:
             else max(float(front_transition_guard_pitch_threshold), 0.0)
         )
         self.front_transition_guard_height_ratio = max(float(front_transition_guard_height_ratio), 0.0)
+        self.front_transition_guard_release_tail_s = max(float(front_transition_guard_release_tail_s), 0.0)
         self.pre_swing_guard_roll_threshold = (
             np.inf if pre_swing_guard_roll_threshold is None else max(float(pre_swing_guard_roll_threshold), 0.0)
         )
@@ -555,7 +558,9 @@ class RearTransitionManager:
         actual_contact: bool,
         previous_actual_contact: bool,
         recovery_active: bool,
+        roll_mag: float,
         pitch_mag: float,
+        height_ratio: float,
         current_foot_vz: float | None = None,
         foot_grf_world: np.ndarray | None = None,
     ) -> bool:
@@ -577,9 +582,14 @@ class RearTransitionManager:
             and bool(rear_contact_signal[local_leg])
         ):
             return False
-        if not np.isfinite(self.pre_swing_guard_pitch_threshold):
-            return False
-        if float(pitch_mag) + 1e-12 < float(self.pre_swing_guard_pitch_threshold):
+        posture_guard_active = False
+        if self.pre_swing_guard_height_ratio > 1e-9:
+            posture_guard_active = float(height_ratio) <= float(self.pre_swing_guard_height_ratio)
+        if (not posture_guard_active) and np.isfinite(self.pre_swing_guard_roll_threshold):
+            posture_guard_active = float(roll_mag) + 1e-12 >= float(self.pre_swing_guard_roll_threshold)
+        if (not posture_guard_active) and np.isfinite(self.pre_swing_guard_pitch_threshold):
+            posture_guard_active = float(pitch_mag) + 1e-12 >= float(self.pre_swing_guard_pitch_threshold)
+        if not posture_guard_active:
             return False
         if self.contact_debounce_s > 1e-9 and (
             float(self.actual_contact_elapsed_s[local_leg]) + 1e-12 < float(self.contact_debounce_s)
@@ -689,6 +699,9 @@ class RearTransitionManager:
         pitch_mag: float,
         height_ratio: float,
         simulation_dt: float,
+        rear_support_active: bool,
+        rear_all_contact_active: bool,
+        rear_contacts_stable: bool,
     ) -> tuple[int, float, float]:
         if not self.enabled:
             return 0, 0.0, 1.0
@@ -703,6 +716,20 @@ class RearTransitionManager:
             self.front_transition_guard_remaining_s[local_leg] = 0.0
             return 0, 0.0, 1.0
 
+        support_ready = bool(rear_contacts_stable)
+        if support_ready:
+            release_tail_s = min(
+                max(float(self.front_transition_guard_release_tail_s), 0.0),
+                hold_s,
+            )
+            if release_tail_s <= 1e-9:
+                self.front_transition_guard_remaining_s[local_leg] = 0.0
+                return 0, 0.0, 1.0
+            self.front_transition_guard_remaining_s[local_leg] = min(
+                float(self.front_transition_guard_remaining_s[local_leg]),
+                release_tail_s,
+            )
+
         trigger_now = self.should_delay_front_preswing_for_rear_transition(
             gait_name=gait_name,
             scheduled_swing=scheduled_swing,
@@ -713,7 +740,7 @@ class RearTransitionManager:
             pitch_mag=pitch_mag,
             height_ratio=height_ratio,
         )
-        if trigger_now:
+        if trigger_now and not support_ready:
             self.front_transition_guard_remaining_s[local_leg] = max(
                 float(self.front_transition_guard_remaining_s[local_leg]),
                 hold_s,

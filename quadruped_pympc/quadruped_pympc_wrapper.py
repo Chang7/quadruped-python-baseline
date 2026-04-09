@@ -43,6 +43,12 @@ class QuadrupedPyMPC_Wrapper:
         self.nmpc_joints_acc = LegsAttr(FL=np.zeros(3), FR=np.zeros(3), RL=np.zeros(3), RR=np.zeros(3))
         self.nmpc_predicted_state = np.zeros(12)
         self.best_sample_freq = self.wb_interface.pgg.step_freq
+        self.applied_linear_support_force_floor_ratio = 0.0
+        self.applied_linear_rear_handoff_leg_index = -1
+        self.applied_linear_rear_handoff_leg_floor_scale = 0.0
+        self.applied_linear_latched_force_scale = 0.0
+        self.applied_linear_latched_front_receiver_scale = 0.0
+        self.applied_linear_latched_rear_receiver_scale = 0.0
 
         self.quadrupedpympc_observables_names = quadrupedpympc_observables_names
         self.quadrupedpympc_observables = {}
@@ -53,6 +59,13 @@ class QuadrupedPyMPC_Wrapper:
         rear_alpha: float,
         recovery_alpha: float = 0.0,
         rear_all_contact_alpha: float = 0.0,
+        rear_all_contact_front_planted_tail_alpha: float = 0.0,
+        rear_all_contact_weak_leg_index: int = -1,
+        rear_all_contact_weak_leg_alpha: float = 0.0,
+        rear_close_handoff_leg_index: int = -1,
+        rear_close_handoff_alpha: float = 0.0,
+        rear_late_load_share_leg_index: int = -1,
+        rear_late_load_share_alpha: float = 0.0,
     ) -> dict | None:
         if cfg.mpc_params['type'] != 'linear_osqp':
             return None
@@ -60,7 +73,22 @@ class QuadrupedPyMPC_Wrapper:
         rear_alpha = float(np.clip(rear_alpha, 0.0, 1.0))
         recovery_alpha = float(np.clip(recovery_alpha, 0.0, 1.0))
         rear_all_contact_alpha = float(np.clip(rear_all_contact_alpha, 0.0, 1.0))
-        if max(front_alpha, rear_alpha, recovery_alpha, rear_all_contact_alpha) <= 1e-9:
+        rear_all_contact_front_planted_tail_alpha = float(
+            np.clip(rear_all_contact_front_planted_tail_alpha, 0.0, 1.0)
+        )
+        rear_all_contact_weak_leg_alpha = float(np.clip(rear_all_contact_weak_leg_alpha, 0.0, 1.0))
+        rear_close_handoff_alpha = float(np.clip(rear_close_handoff_alpha, 0.0, 1.0))
+        rear_late_load_share_alpha = float(np.clip(rear_late_load_share_alpha, 0.0, 1.0))
+        if max(
+            front_alpha,
+            rear_alpha,
+            recovery_alpha,
+            rear_all_contact_alpha,
+            rear_all_contact_front_planted_tail_alpha,
+            rear_all_contact_weak_leg_alpha,
+            rear_close_handoff_alpha,
+            rear_late_load_share_alpha,
+        ) <= 1e-9:
             return None
         if not isinstance(getattr(cfg, 'linear_osqp_params', None), dict):
             return None
@@ -70,6 +98,21 @@ class QuadrupedPyMPC_Wrapper:
         def _raise_from_backup(name: str, delta: float, lower: float = 0.0, upper: float | None = None) -> None:
             base = float(backup.get(name, cfg.linear_osqp_params.get(name, 0.0)))
             value = base + float(delta)
+            value = max(lower, value)
+            if upper is not None:
+                value = min(upper, value)
+            cfg.linear_osqp_params[name] = value
+
+        def _blend_to_backup_target(
+            name: str,
+            target_name: str,
+            alpha: float,
+            lower: float = 0.0,
+            upper: float | None = None,
+        ) -> None:
+            base = float(backup.get(name, cfg.linear_osqp_params.get(name, 0.0)))
+            target = float(backup.get(target_name, base))
+            value = base + float(alpha) * (target - base)
             value = max(lower, value)
             if upper is not None:
                 value = min(upper, value)
@@ -191,6 +234,102 @@ class QuadrupedPyMPC_Wrapper:
                 lower=0.0,
             )
 
+        if rear_all_contact_front_planted_tail_alpha > 1e-9:
+            _raise_from_backup(
+                "support_force_floor_ratio",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_support_floor_delta", 0.0)),
+                lower=0.0,
+                upper=1.0,
+            )
+            _raise_from_backup(
+                "rear_floor_base_scale",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_rear_floor_delta", 0.0)),
+                lower=0.0,
+                upper=1.5,
+            )
+            _raise_from_backup(
+                "z_pos_gain",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_z_pos_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_angle_gain",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_roll_angle_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "roll_rate_gain",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_roll_rate_gain_delta", 0.0)),
+                lower=0.0,
+            )
+            _raise_from_backup(
+                "side_rebalance_gain",
+                rear_all_contact_front_planted_tail_alpha
+                * float(backup.get("rear_all_contact_front_planted_side_rebalance_delta", 0.0)),
+                lower=0.0,
+            )
+            _blend_to_backup_target(
+                "latched_force_scale",
+                "rear_all_contact_front_planted_latched_force_scale_target",
+                rear_all_contact_front_planted_tail_alpha,
+                lower=0.0,
+                upper=1.0,
+            )
+            _blend_to_backup_target(
+                "latched_front_receiver_scale",
+                "rear_all_contact_front_planted_latched_front_receiver_scale_target",
+                rear_all_contact_front_planted_tail_alpha,
+                lower=0.0,
+            )
+            _blend_to_backup_target(
+                "latched_rear_receiver_scale",
+                "rear_all_contact_front_planted_latched_rear_receiver_scale_target",
+                rear_all_contact_front_planted_tail_alpha,
+                lower=0.0,
+            )
+
+        targeted_rear_leg_index = -1
+        targeted_rear_leg_floor_delta = 0.0
+        if rear_close_handoff_alpha > 1e-9 and int(rear_close_handoff_leg_index) in (2, 3):
+            targeted_rear_leg_index = int(rear_close_handoff_leg_index)
+            targeted_rear_leg_floor_delta = max(
+                targeted_rear_leg_floor_delta,
+                rear_close_handoff_alpha * float(backup.get("rear_close_handoff_leg_floor_scale_delta", 0.0)),
+            )
+        if rear_late_load_share_alpha > 1e-9 and int(rear_late_load_share_leg_index) in (2, 3):
+            late_load_share_delta = (
+                rear_late_load_share_alpha
+                * float(backup.get("rear_late_load_share_support_leg_floor_scale_delta", 0.0))
+            )
+            if int(rear_late_load_share_leg_index) == targeted_rear_leg_index:
+                targeted_rear_leg_floor_delta += late_load_share_delta
+            elif late_load_share_delta > targeted_rear_leg_floor_delta:
+                targeted_rear_leg_index = int(rear_late_load_share_leg_index)
+                targeted_rear_leg_floor_delta = late_load_share_delta
+        if rear_all_contact_weak_leg_alpha > 1e-9 and int(rear_all_contact_weak_leg_index) in (2, 3):
+            weak_leg_delta = (
+                rear_all_contact_weak_leg_alpha
+                * float(backup.get("rear_all_contact_stabilization_weak_leg_floor_delta", 0.0))
+            )
+            if int(rear_all_contact_weak_leg_index) == targeted_rear_leg_index:
+                targeted_rear_leg_floor_delta += weak_leg_delta
+            elif weak_leg_delta > targeted_rear_leg_floor_delta:
+                targeted_rear_leg_index = int(rear_all_contact_weak_leg_index)
+                targeted_rear_leg_floor_delta = weak_leg_delta
+        if targeted_rear_leg_floor_delta > 1e-9 and targeted_rear_leg_index in (2, 3):
+            cfg.linear_osqp_params["rear_handoff_leg_index"] = int(targeted_rear_leg_index)
+            _raise_from_backup(
+                "rear_handoff_leg_floor_scale",
+                targeted_rear_leg_floor_delta,
+                lower=0.0,
+                upper=2.0,
+            )
+
         return backup
 
     def compute_actions(
@@ -283,6 +422,12 @@ class QuadrupedPyMPC_Wrapper:
         # Solve OCP ---------------------------------------------------------------------------------------
         support_override_backup = None
         support_alpha = 0.0
+        self.applied_linear_support_force_floor_ratio = 0.0
+        self.applied_linear_rear_handoff_leg_index = -1
+        self.applied_linear_rear_handoff_leg_floor_scale = 0.0
+        self.applied_linear_latched_force_scale = 0.0
+        self.applied_linear_latched_front_receiver_scale = 0.0
+        self.applied_linear_latched_rear_receiver_scale = 0.0
         if step_num % round(1 / (self.mpc_frequency * simulation_dt)) == 0:
             if cfg.mpc_params['type'] == 'linear_osqp':
                 front_support_alpha = float(getattr(self.wb_interface, 'front_touchdown_support_alpha', 0.0))
@@ -291,12 +436,66 @@ class QuadrupedPyMPC_Wrapper:
                 rear_all_contact_alpha = float(
                     getattr(self.wb_interface, 'rear_all_contact_stabilization_alpha', 0.0)
                 )
+                rear_all_contact_front_planted_tail_alpha = float(
+                    getattr(self.wb_interface, 'rear_all_contact_front_planted_tail_alpha', 0.0)
+                )
+                crawl_front_planted_seam_support_alpha = float(
+                    getattr(self.wb_interface, 'crawl_front_planted_seam_support_alpha', 0.0)
+                )
+                front_planted_support_alpha = max(
+                    rear_all_contact_front_planted_tail_alpha,
+                    crawl_front_planted_seam_support_alpha,
+                )
+                rear_all_contact_weak_leg_index = int(
+                    getattr(self.wb_interface, 'rear_all_contact_weak_leg_index', -1)
+                )
+                rear_all_contact_weak_leg_alpha = float(
+                    getattr(self.wb_interface, 'rear_all_contact_weak_leg_alpha', 0.0)
+                )
+                rear_close_handoff_alpha = float(
+                    getattr(self.wb_interface, 'rear_close_handoff_alpha', 0.0)
+                )
+                rear_close_handoff_leg_index = int(
+                    getattr(self.wb_interface, 'rear_close_handoff_leg_index', -1)
+                )
+                rear_late_load_share_alpha = float(
+                    getattr(self.wb_interface, 'rear_late_load_share_alpha', 0.0)
+                )
+                rear_late_load_share_leg_index = int(
+                    getattr(self.wb_interface, 'rear_late_load_share_leg_index', -1)
+                )
                 support_override_backup = self._apply_linear_touchdown_support_overrides(
                     front_support_alpha,
                     rear_support_alpha,
                     recovery_alpha,
                     rear_all_contact_alpha,
+                    front_planted_support_alpha,
+                    rear_all_contact_weak_leg_index,
+                    rear_all_contact_weak_leg_alpha,
+                    rear_close_handoff_leg_index,
+                    rear_close_handoff_alpha,
+                    rear_late_load_share_leg_index,
+                    rear_late_load_share_alpha,
                 )
+                if support_override_backup is not None:
+                    self.applied_linear_support_force_floor_ratio = float(
+                        cfg.linear_osqp_params.get("support_force_floor_ratio", 0.0)
+                    )
+                    self.applied_linear_rear_handoff_leg_index = int(
+                        cfg.linear_osqp_params.get("rear_handoff_leg_index", -1)
+                    )
+                    self.applied_linear_rear_handoff_leg_floor_scale = float(
+                        cfg.linear_osqp_params.get("rear_handoff_leg_floor_scale", 0.0)
+                    )
+                    self.applied_linear_latched_force_scale = float(
+                        cfg.linear_osqp_params.get("latched_force_scale", 0.0)
+                    )
+                    self.applied_linear_latched_front_receiver_scale = float(
+                        cfg.linear_osqp_params.get("latched_front_receiver_scale", 0.0)
+                    )
+                    self.applied_linear_latched_rear_receiver_scale = float(
+                        cfg.linear_osqp_params.get("latched_rear_receiver_scale", 0.0)
+                    )
             try:
                 (
                     self.nmpc_GRFs,
@@ -518,6 +717,125 @@ class QuadrupedPyMPC_Wrapper:
                 data = {'touchdown_settle_active': np.asarray(self.wb_interface.touchdown_settle_active, dtype=float).copy()}
             elif obs_name == 'touchdown_support_active':
                 data = {'touchdown_support_active': np.asarray(self.wb_interface.touchdown_support_active, dtype=float).copy()}
+            elif obs_name == 'rear_retry_contact_signal':
+                data = {'rear_retry_contact_signal': np.asarray(self.wb_interface.rear_retry_contact_signal_debug, dtype=float).copy()}
+            elif obs_name == 'rear_touchdown_contact_ready':
+                data = {'rear_touchdown_contact_ready': np.asarray(self.wb_interface.rear_touchdown_contact_ready_debug, dtype=float).copy()}
+            elif obs_name == 'rear_late_stance_contact_ready':
+                data = {'rear_late_stance_contact_ready': np.asarray(self.wb_interface.rear_late_stance_contact_ready_debug, dtype=float).copy()}
+            elif obs_name == 'rear_all_contact_support_needed':
+                data = {'rear_all_contact_support_needed': np.asarray(self.wb_interface.rear_all_contact_support_needed_debug, dtype=float).copy()}
+            elif obs_name == 'rear_late_seam_elapsed_s':
+                data = {'rear_late_seam_elapsed_s': np.asarray(self.wb_interface.rear_late_seam_elapsed_s, dtype=float).copy()}
+            elif obs_name == 'rear_late_seam_support_active':
+                data = {'rear_late_seam_support_active': np.asarray(self.wb_interface.rear_late_seam_support_active_debug, dtype=float).copy()}
+            elif obs_name == 'rear_close_handoff_active':
+                data = {'rear_close_handoff_active': np.asarray(self.wb_interface.rear_close_handoff_active_debug, dtype=float).copy()}
+            elif obs_name == 'rear_late_load_share_active':
+                data = {
+                    'rear_late_load_share_active': np.asarray(
+                        self.wb_interface.rear_late_load_share_active_debug,
+                        dtype=float,
+                    ).copy()
+                }
+            elif obs_name == 'rear_late_load_share_alpha':
+                data = {
+                    'rear_late_load_share_alpha': np.asarray(
+                        self.wb_interface.rear_late_load_share_alpha_debug,
+                        dtype=float,
+                    ).copy()
+                }
+            elif obs_name == 'rear_late_load_share_candidate_active':
+                data = {
+                    'rear_late_load_share_candidate_active': np.asarray(
+                        self.wb_interface.rear_late_load_share_candidate_active_debug,
+                        dtype=float,
+                    ).copy()
+                }
+            elif obs_name == 'rear_late_load_share_candidate_alpha':
+                data = {
+                    'rear_late_load_share_candidate_alpha': np.asarray(
+                        self.wb_interface.rear_late_load_share_candidate_alpha_debug,
+                        dtype=float,
+                    ).copy()
+                }
+            elif obs_name == 'rear_late_load_share_trigger_elapsed_s':
+                data = {
+                    'rear_late_load_share_trigger_elapsed_s': np.asarray(
+                        self.wb_interface.rear_late_load_share_trigger_elapsed_s,
+                        dtype=float,
+                    ).copy()
+                }
+            elif obs_name == 'rear_late_load_share_trigger_enabled':
+                data = {
+                    'rear_late_load_share_trigger_enabled': float(
+                        getattr(self.wb_interface, 'rear_late_load_share_trigger_enabled_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'rear_close_handoff_alpha':
+                data = {
+                    'rear_close_handoff_alpha': float(
+                        getattr(self.wb_interface, 'rear_close_handoff_alpha', 0.0)
+                    )
+                }
+            elif obs_name == 'rear_close_handoff_leg_index':
+                data = {
+                    'rear_close_handoff_leg_index': float(
+                        getattr(self.wb_interface, 'rear_close_handoff_leg_index', -1)
+                    )
+                }
+            elif obs_name == 'rear_all_contact_weak_leg_alpha':
+                data = {
+                    'rear_all_contact_weak_leg_alpha': float(
+                        getattr(self.wb_interface, 'rear_all_contact_weak_leg_alpha', 0.0)
+                    )
+                }
+            elif obs_name == 'rear_all_contact_weak_leg_index':
+                data = {
+                    'rear_all_contact_weak_leg_index': float(
+                        getattr(self.wb_interface, 'rear_all_contact_weak_leg_index', -1)
+                    )
+                }
+            elif obs_name == 'applied_linear_support_force_floor_ratio':
+                data = {
+                    'applied_linear_support_force_floor_ratio': float(
+                        getattr(self, 'applied_linear_support_force_floor_ratio', 0.0)
+                    )
+                }
+            elif obs_name == 'applied_linear_rear_handoff_leg_index':
+                data = {
+                    'applied_linear_rear_handoff_leg_index': float(
+                        getattr(self, 'applied_linear_rear_handoff_leg_index', -1)
+                    )
+                }
+            elif obs_name == 'applied_linear_rear_handoff_leg_floor_scale':
+                data = {
+                    'applied_linear_rear_handoff_leg_floor_scale': float(
+                        getattr(self, 'applied_linear_rear_handoff_leg_floor_scale', 0.0)
+                    )
+                }
+            elif obs_name == 'applied_linear_latched_force_scale':
+                data = {
+                    'applied_linear_latched_force_scale': float(
+                        getattr(self, 'applied_linear_latched_force_scale', 0.0)
+                    )
+                }
+            elif obs_name == 'applied_linear_latched_front_receiver_scale':
+                data = {
+                    'applied_linear_latched_front_receiver_scale': float(
+                        getattr(self, 'applied_linear_latched_front_receiver_scale', 0.0)
+                    )
+                }
+            elif obs_name == 'applied_linear_latched_rear_receiver_scale':
+                data = {
+                    'applied_linear_latched_rear_receiver_scale': float(
+                        getattr(self, 'applied_linear_latched_rear_receiver_scale', 0.0)
+                    )
+                }
+            elif obs_name == 'rear_touchdown_actual_contact_elapsed_s':
+                data = {'rear_touchdown_actual_contact_elapsed_s': np.asarray(self.wb_interface.rear_touchdown_actual_contact_elapsed_s, dtype=float).copy()}
+            elif obs_name == 'rear_touchdown_pending_confirm':
+                data = {'rear_touchdown_pending_confirm': np.asarray(self.wb_interface.rear_touchdown_pending_confirm, dtype=float).copy()}
             elif obs_name == 'front_margin_rescue_active':
                 data = {'front_margin_rescue_active': np.asarray(self.wb_interface.front_margin_rescue_active, dtype=float).copy()}
             elif obs_name == 'front_margin_rescue_alpha':
@@ -534,6 +852,18 @@ class QuadrupedPyMPC_Wrapper:
                         getattr(self.wb_interface, 'rear_all_contact_stabilization_alpha', 0.0)
                     )
                 }
+            elif obs_name == 'rear_all_contact_front_planted_tail_alpha':
+                data = {
+                    'rear_all_contact_front_planted_tail_alpha': float(
+                        getattr(self.wb_interface, 'rear_all_contact_front_planted_tail_alpha', 0.0)
+                    )
+                }
+            elif obs_name == 'crawl_front_planted_seam_support_alpha':
+                data = {
+                    'crawl_front_planted_seam_support_alpha': float(
+                        getattr(self.wb_interface, 'crawl_front_planted_seam_support_alpha', 0.0)
+                    )
+                }
             elif obs_name == 'rear_handoff_support_active':
                 data = {'rear_handoff_support_active': float(getattr(self.wb_interface, 'rear_handoff_support_active', 0.0))}
             elif obs_name == 'rear_swing_bridge_active':
@@ -544,6 +874,75 @@ class QuadrupedPyMPC_Wrapper:
                 data = {'full_contact_recovery_active': float(self.wb_interface.full_contact_recovery_active)}
             elif obs_name == 'full_contact_recovery_alpha':
                 data = {'full_contact_recovery_alpha': float(self.wb_interface.full_contact_recovery_alpha)}
+            elif obs_name == 'full_contact_recovery_remaining_s':
+                data = {'full_contact_recovery_remaining_s': float(self.wb_interface.full_contact_recovery_remaining_s)}
+            elif obs_name == 'full_contact_recovery_trigger':
+                data = {
+                    'full_contact_recovery_trigger': float(
+                        getattr(self.wb_interface, 'full_contact_recovery_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'front_delayed_swing_recovery_trigger':
+                data = {
+                    'front_delayed_swing_recovery_trigger': float(
+                        getattr(self.wb_interface, 'front_delayed_swing_recovery_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'planted_front_recovery_trigger':
+                data = {
+                    'planted_front_recovery_trigger': float(
+                        getattr(self.wb_interface, 'planted_front_recovery_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'planted_front_postdrop_recovery_trigger':
+                data = {
+                    'planted_front_postdrop_recovery_trigger': float(
+                        getattr(self.wb_interface, 'planted_front_postdrop_recovery_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'front_close_gap_trigger':
+                data = {
+                    'front_close_gap_trigger': float(
+                        getattr(self.wb_interface, 'front_close_gap_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'front_late_rearm_trigger':
+                data = {
+                    'front_late_rearm_trigger': float(
+                        getattr(self.wb_interface, 'front_late_rearm_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'front_planted_posture_tail_trigger':
+                data = {
+                    'front_planted_posture_tail_trigger': float(
+                        getattr(self.wb_interface, 'front_planted_posture_tail_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'front_late_posture_tail_trigger':
+                data = {
+                    'front_late_posture_tail_trigger': float(
+                        getattr(self.wb_interface, 'front_late_posture_tail_trigger_debug', 0.0)
+                    )
+                }
+            elif obs_name == 'crawl_front_stance_support_tail_remaining_s':
+                data = {
+                    'crawl_front_stance_support_tail_remaining_s': float(
+                        self.wb_interface.crawl_front_stance_support_tail_remaining_s
+                    )
+                }
+            elif obs_name == 'front_touchdown_support_recent_remaining_s':
+                data = {
+                    'front_touchdown_support_recent_remaining_s': float(
+                        self.wb_interface.front_touchdown_support_recent_remaining_s
+                    )
+                }
+            elif obs_name == 'front_delayed_swing_recovery_spent':
+                data = {
+                    'front_delayed_swing_recovery_spent': np.asarray(
+                        self.wb_interface.front_delayed_swing_recovery_spent,
+                        dtype=float,
+                    ).copy()
+                }
             elif obs_name == 'gate_forward_scale':
                 data = {'gate_forward_scale': float(self.wb_interface.last_gate_forward_scale)}
 
