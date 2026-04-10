@@ -2854,11 +2854,14 @@ class WBInterface:
             rear_all_contact_alpha = 0.0
             front_close_gap_keep_swing_mask = np.zeros(2, dtype=bool)
             front_planted_seam_keep_swing_mask = np.zeros(2, dtype=bool)
+            actual_contact_array = np.asarray(actual_contact, dtype=int)
+            transition_contact_array = np.asarray(transition_contact, dtype=int)
+            previous_actual_contact_array = np.asarray(self.previous_actual_contact, dtype=int)
+            front_late_posture_tail_candidate = False
+            front_planted_posture_tail_candidate = False
+            front_planted_posture_tail_trigger = False
             recovery_hold_s = float(self.full_contact_recovery_hold_s)
             if recovery_hold_s > 1e-9:
-                actual_contact_array = np.asarray(actual_contact, dtype=int)
-                transition_contact_array = np.asarray(transition_contact, dtype=int)
-                previous_actual_contact_array = np.asarray(self.previous_actual_contact, dtype=int)
                 # For late crawl seams, the foot-contact signal often returns one or
                 # two control ticks before the stricter MuJoCo geometry contact
                 # closes the current-contact state. Let full-contact recovery key off
