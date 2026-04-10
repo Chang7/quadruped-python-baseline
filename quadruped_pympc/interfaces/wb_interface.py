@@ -4604,7 +4604,7 @@ class WBInterface:
 
         for leg_id in range(2, 4):
             remaining_s = float(self.rear_touchdown_close_lock_remaining_s[leg_id])
-            if remaining_s <= 1e-9 or float(self.rear_touchdown_close_lock_hold_s) <= 1e-9:
+            if remaining_s <= 1e-9:
                 self.rear_touchdown_close_lock_remaining_s[leg_id] = 0.0
                 continue
             if bool(actual_contact[leg_id]):

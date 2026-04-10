@@ -75,8 +75,14 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "Q_w_pitch": 24000.0,
         "vy_gain": 6.0,
         "vx_gain": 2.3,
-        "fy_scale": 0.20,
-        "dynamic_fy_roll_gain": 0.0,
+        "fy_scale": 1.0,
+        # Roll-proportional lateral force for centripetal roll compensation.
+        # Tested 0.0/0.15/0.20/0.25: monotonic improvement on turn roll
+        # (0.024->0.018) with no straight/disturbance regression. 0.25 matches
+        # straight_tuned. Symmetric Q_theta_roll (160k->240k) was tested and
+        # rejected: no turn roll effect, disturbance regression -- confirming
+        # the gap is lateral force authority, not MPC cost weighting.
+        "dynamic_fy_roll_gain": 0.25,
         "dynamic_fy_roll_ref": 0.18,
         # Turn-specific foothold yaw compensation helps the linear controller
         # generate a clearer turning geometry without affecting straight-line
@@ -108,12 +114,18 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "pitch_angle_gain": 40.0,
         "pitch_rate_gain": 12.0,
         "pitch_rebalance_ref": 0.20,
-        # The remaining dynamic-gait error was a steady posture bias rather than
-        # a collapse. A small roll/pitch reference bias cleans up that offset
-        # across turn, disturbance, and long straight trot without sacrificing
-        # forward tracking.
+        # The remaining dynamic-gait error is a steady posture bias (mean signed
+        # pitch = mean |pitch|, not oscillating). roll_ref_offset=+0.03 was the
+        # original fix. pitch_ref_offset was then swept from -0.01 to -0.03:
+        # the stronger offset cuts mean |pitch| by 27-40% across all scenarios,
+        # now beating stock pitch in every trot check.
         "roll_ref_offset": 0.03,
-        "pitch_ref_offset": -0.01,
+        # The remaining dynamic-gait error is a steady posture bias (mean signed
+        # pitch = mean |pitch|, not oscillating). roll_ref_offset=+0.03 was the
+        # original fix. pitch_ref_offset was then swept from -0.01 to -0.03:
+        # the stronger offset cuts mean |pitch| by 27-40% across all scenarios,
+        # now beating stock pitch in every trot check.
+        "pitch_ref_offset": -0.03,
         "pre_swing_gate_min_margin": 0.0,
         "front_pre_swing_gate_min_margin": 0.0,
         "rear_pre_swing_gate_min_margin": 0.0,
@@ -855,6 +867,12 @@ def main() -> None:
                         "rear_late_load_share_support_leg_floor_scale_delta": 0.10,
                         "rear_all_contact_stabilization_min_rear_load_share": 0.18,
                         "rear_all_contact_stabilization_min_rear_leg_load_share": 0.0,
+                        # The weak-leg sub-path within all-contact stabilization is
+                        # disabled (share_ref=0.0 means condition never fires).
+                        # Testing share_ref=0.40 caused severe regression (7.3s vs
+                        # 13.54s baseline) because the threshold fires too broadly
+                        # during normal alternating crawl stance, causing
+                        # overcorrection and FR_hip invalid contact via side roll.
                         "rear_all_contact_stabilization_weak_leg_share_ref": 0.0,
                         "rear_all_contact_stabilization_weak_leg_floor_delta": 0.10,
                         "rear_all_contact_stabilization_weak_leg_height_ratio": 0.0,

@@ -12,14 +12,14 @@ OUT_DIR = ROOT / "outputs" / "report_progress_explainer" / "stock_vs_linear_anal
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 RUNS = {
-    "stock_trot_straight": ROOT / "outputs" / "curated_runs" / "stock_sampling_trot_4s_s012_isolated_recheck" / "episode_000" / "summary.json",
-    "stock_trot_turn": ROOT / "outputs" / "curated_runs" / "stock_sampling_trot_turn_4s_y04_recheck" / "episode_000" / "summary.json",
-    "stock_trot_disturb": ROOT / "outputs" / "curated_runs" / "stock_sampling_trot_disturb_4s_x48_recheck" / "episode_000" / "summary.json",
-    "stock_crawl": ROOT / "outputs" / "curated_runs" / "stock_sampling_crawl_4s_s012_isolated_recheck" / "episode_000" / "summary.json",
-    "linear_trot_straight": ROOT / "outputs" / "archive" / "raw_runs" / "20260408_stock_linear_graph_inputs" / "linear_trot_straight_4s" / "episode_000" / "summary.json",
-    "linear_trot_turn": ROOT / "outputs" / "archive" / "raw_runs" / "20260408_stock_linear_graph_inputs" / "linear_trot_turn_4s" / "episode_000" / "summary.json",
-    "linear_trot_disturb": ROOT / "outputs" / "archive" / "raw_runs" / "20260408_stock_linear_graph_inputs" / "linear_trot_disturb_4s" / "episode_000" / "summary.json",
-    "linear_crawl": ROOT / "outputs" / "archive" / "raw_runs" / "20260408_stock_linear_graph_inputs" / "linear_crawl_4s" / "episode_000" / "summary.json",
+    "stock_trot_straight": ROOT / "outputs" / "curated_runs" / "stock_baselines" / "stock_trot_straight_20s_weeklyref" / "episode_000" / "summary.json",
+    "stock_trot_turn": ROOT / "outputs" / "curated_runs" / "stock_baselines" / "stock_trot_turn_10s_weeklyref" / "episode_000" / "summary.json",
+    "stock_trot_disturb": ROOT / "outputs" / "curated_runs" / "stock_baselines" / "stock_sampling_trot_disturb_4s_x48_recheck" / "episode_000" / "summary.json",
+    "stock_crawl": ROOT / "outputs" / "curated_runs" / "stock_baselines" / "stock_sampling_crawl_4s_s012_isolated_recheck" / "episode_000" / "summary.json",
+    "linear_trot_straight": ROOT / "outputs" / "curated_runs" / "current" / "trot_straight_20s_g025_pitchoff003" / "episode_000" / "summary.json",
+    "linear_trot_turn": ROOT / "outputs" / "curated_runs" / "current" / "trot_turn_10s_g025_pitchoff003" / "episode_000" / "summary.json",
+    "linear_trot_disturb": ROOT / "outputs" / "curated_runs" / "current" / "trot_disturb_4s_g025_pitchoff003" / "episode_000" / "summary.json",
+    "linear_crawl": ROOT / "outputs" / "curated_runs" / "current" / "crawl_current_default_20s" / "episode_000" / "summary.json",
 }
 
 STOCK_COLOR = "#4C78A8"
@@ -57,9 +57,9 @@ def _add_bar_labels(ax: plt.Axes, bars, fmt: str = "{:.3f}") -> None:
 
 def make_trot_overview(data: dict[str, dict]) -> Path:
     scenarios = [
-        ("trot_straight", "Straight"),
-        ("trot_turn", "Turn"),
-        ("trot_disturb", "Disturb"),
+        ("trot_straight", "Straight 20 s"),
+        ("trot_turn", "Turn 10 s"),
+        ("trot_disturb", "Disturb 4 s"),
     ]
     metrics = [
         ("mean_vx", "mean vx [m/s]"),
@@ -91,8 +91,8 @@ def make_trot_overview(data: dict[str, dict]) -> Path:
 
     axes[0].legend(loc="upper left")
     fig.suptitle(
-        "Stock vs linear(custom): 4 s trot comparison\n"
-        "robot=aliengo | scene=flat | gait=trot | straight/turn/disturbance diagnostics",
+        "Stock vs linear(custom): current reference trot comparison\n"
+        "robot=aliengo | scene=flat | scenario-specific current horizons",
         fontsize=14,
         fontweight="bold",
         y=0.98,
@@ -184,7 +184,7 @@ def make_crawl_diagnostic(data: dict[str, dict]) -> Path:
 
     fig.suptitle(
         "Stock vs linear(custom): crawl diagnostic\n"
-        "same 4 s horizon, but stock crawl is also not a clean stable baseline in this setting",
+        "stock crawl stays short-horizon only; custom crawl uses the current 20 s diagnostic default",
         fontsize=14,
         fontweight="bold",
         y=0.98,
@@ -261,7 +261,7 @@ def make_summary_table(data: dict[str, dict]) -> Path:
             cell.set_facecolor("#FFF8F4")
 
     fig.suptitle(
-        "Stock vs linear(custom): summary table for matched 4 s checks",
+        "Stock vs linear(custom): summary table for current reference checks",
         fontsize=13,
         fontweight="bold",
         y=0.96,
@@ -276,7 +276,7 @@ def make_summary_table(data: dict[str, dict]) -> Path:
 def write_readme(trot_path: Path, crawl_path: Path, table_path: Path) -> Path:
     text = f"""# Stock vs linear(custom) analysis bundle
 
-This folder contains matched-horizon (`4 s`) comparison figures between the stock sampling controller and the custom `linear_osqp` controller.
+This folder contains the current reference comparison figures between the stock sampling controller and the custom `linear_osqp` controller.
 
 Files:
 - `{table_path.name}`: compact summary table across trot/crawl checks
