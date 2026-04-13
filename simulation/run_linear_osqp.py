@@ -134,35 +134,13 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
     }
 
 
-def _trot_straight_tuned_profile() -> dict[str, float | int]:
-    """Straight-line trot profile tuned for longer-horizon forward tracking."""
-    profile = _dynamic_gait_conservative_profile()
-    profile.update(
-        {
-            "vx_gain": 5.5,
-            "fy_scale": 1.0,
-            "dynamic_fy_roll_gain": 0.0,
-            "stance_joint_pd_scale": 0.10,
-            "joint_pd_scale": 0.10,
-            "latched_joint_pd_scale": 0.10,
-            "rear_floor_base_scale": 0.50,
-            "rear_floor_pitch_gain": 0.0,
-            "support_reference_mix": 0.75,
-            "support_reference_xy_mix": 1.0,
-            "reduced_support_vertical_boost": 0.30,
-            "pitch_angle_gain": 37.0,
-            "pitch_rate_gain": 11.0,
-            "support_centroid_x_gain": 1.0,
-        }
-    )
-    return profile
-
-
 def _dynamic_gait_profile_for(gait: str, trot_profile: str) -> dict[str, float | int]:
+    # With fy_scale=1.0, a single generic profile covers straight/turn/disturbance.
+    # The previous straight_tuned profile was needed when fy_scale=0.35 required
+    # separate tuning for straight-line tracking, but sweep tests confirmed that
+    # the generic profile now handles all trot scenarios without regression.
     if gait not in {"trot", "pace", "bound"}:
         return {}
-    if gait == "trot" and trot_profile == "straight_tuned":
-        return _trot_straight_tuned_profile()
     return _dynamic_gait_conservative_profile()
 
 
@@ -173,16 +151,14 @@ def _resolve_dynamic_trot_profile(
     lateral_speed: float,
     disturbance_schedule: list[dict[str, object]],
 ) -> str:
-    """Resolve the effective trot dynamic profile from the requested mode.
+    """Resolve the effective trot dynamic profile.
 
-    `auto` is intentionally conservative and deterministic:
-    - straight-line trot without lateral/yaw/disturbance -> `straight_tuned`
-    - otherwise -> `generic`
+    Always returns ``generic`` for trot. The previous ``auto`` routing that
+    selected ``straight_tuned`` for straight-line commands is no longer needed
+    because the generic profile (with fy_scale=1.0) covers all trot scenarios.
     """
-    if gait != "trot" or requested_profile != "auto":
+    if gait != "trot":
         return requested_profile
-    if abs(float(yaw_rate)) < 1e-9 and abs(float(lateral_speed)) < 1e-9 and not disturbance_schedule:
-        return "straight_tuned"
     return "generic"
 
 
@@ -204,8 +180,8 @@ def main() -> None:
         "--dynamic-trot-profile",
         type=str,
         default="auto",
-        choices=("auto", "generic", "straight_tuned"),
-        help="For trot only: use the generic all-scenario profile, the straight-line-tuned profile, or let auto pick between them from the command.",
+        choices=("auto", "generic"),
+        help="For trot only: use the generic all-scenario profile; auto currently resolves to generic as well.",
     )
     parser.add_argument("--yaw-rate", type=float, default=0.0)
     parser.add_argument("--step-height", type=float, default=None, help="Override swing step height in meters.")

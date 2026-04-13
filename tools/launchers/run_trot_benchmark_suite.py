@@ -63,7 +63,7 @@ CASES = [
         controller="linear_osqp",
         seconds=4,
         speed=0.12,
-        dynamic_trot_profile="straight_tuned",
+        dynamic_trot_profile="generic",
     ),
     TrotBenchmarkCase(
         name="stock_trot_turn_4s_y04",
@@ -112,7 +112,7 @@ CASES = [
         controller="linear_osqp",
         seconds=20,
         speed=0.12,
-        dynamic_trot_profile="straight_tuned",
+        dynamic_trot_profile="generic",
     ),
 ]
 
