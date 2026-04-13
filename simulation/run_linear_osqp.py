@@ -76,13 +76,11 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "vy_gain": 6.0,
         "vx_gain": 2.3,
         "fy_scale": 1.0,
-        # Roll-proportional lateral force for centripetal roll compensation.
-        # Tested 0.0/0.15/0.20/0.25: monotonic improvement on turn roll
-        # (0.024->0.018) with no straight/disturbance regression. 0.25 matches
-        # straight_tuned. Symmetric Q_theta_roll (160k->240k) was tested and
-        # rejected: no turn roll effect, disturbance regression -- confirming
-        # the gap is lateral force authority, not MPC cost weighting.
-        "dynamic_fy_roll_gain": 0.25,
+        # With fy_scale=1.0, dynamic_fy_roll_gain has no effect because
+        # it only adjusts fy_scale upward (min(1.0, fy_scale + gain*ratio) = 1.0).
+        # Verified: gain=0.0 and gain=0.25 produce identical results across
+        # all three trot scenarios when fy_scale=1.0.
+        "dynamic_fy_roll_gain": 0.0,
         "dynamic_fy_roll_ref": 0.18,
         # Turn-specific foothold yaw compensation helps the linear controller
         # generate a clearer turning geometry without affecting straight-line
@@ -142,8 +140,8 @@ def _trot_straight_tuned_profile() -> dict[str, float | int]:
     profile.update(
         {
             "vx_gain": 5.5,
-            "fy_scale": 0.35,
-            "dynamic_fy_roll_gain": 0.25,
+            "fy_scale": 1.0,
+            "dynamic_fy_roll_gain": 0.0,
             "stance_joint_pd_scale": 0.10,
             "joint_pd_scale": 0.10,
             "latched_joint_pd_scale": 0.10,
