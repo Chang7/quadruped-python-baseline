@@ -12,9 +12,19 @@ if __package__ is None or __package__ == "":
     REPO_ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(REPO_ROOT))
     from quadruped_pympc import config as cfg
+    from simulation.crawl_preset import (
+        add_crawl_recovery_cli_args,
+        apply_crawl_recovery_cli_overrides,
+        crawl_conservative_params,
+    )
     from simulation.simulation import run_simulation
 else:
     from quadruped_pympc import config as cfg
+    from .crawl_preset import (
+        add_crawl_recovery_cli_args,
+        apply_crawl_recovery_cli_overrides,
+        crawl_conservative_params,
+    )
     from .simulation import run_simulation
 
 
@@ -383,41 +393,7 @@ def main() -> None:
     parser.add_argument("--rear-swing-bridge-lookahead-steps", type=int, default=None, help="How many horizon steps ahead to inspect for an upcoming rear swing when bridging support.")
     parser.add_argument("--rear-swing-bridge-allcontact-release-tail-s", type=float, default=None, help="Once the rear seam has fully closed again, cap the remaining rear-swing bridge hold to this short tail.")
     parser.add_argument("--rear-swing-bridge-rear-alpha-scale", type=float, default=None, help="Blend in this much rear touchdown-support alpha during the rear-swing bridge once only one rear stance leg remains.")
-    parser.add_argument("--full-contact-recovery-hold-s", type=float, default=None, help="Keep touchdown-style support overrides active briefly during unstable four-foot contact.")
-    parser.add_argument("--full-contact-recovery-forward-scale", type=float, default=None, help="Scale forward reference velocity while late full-contact recovery hold is active.")
-    parser.add_argument("--full-contact-recovery-roll-threshold", type=float, default=None, help="Absolute roll threshold in radians that can trigger late full-contact recovery.")
-    parser.add_argument("--full-contact-recovery-pitch-threshold", type=float, default=None, help="Absolute pitch threshold in radians that can trigger late full-contact recovery.")
-    parser.add_argument("--full-contact-recovery-height-ratio", type=float, default=None, help="Trigger late full-contact recovery if base height falls below this ratio of ref_z.")
-    parser.add_argument("--full-contact-recovery-recent-window-s", type=float, default=None, help="Require that front touchdown support was active within this recent time window before late full-contact recovery may trigger.")
-    parser.add_argument("--full-contact-recovery-rear-support-scale", type=float, default=None, help="Blend rear support alpha into late full-contact recovery after a recent rear touchdown seam.")
-    parser.add_argument("--full-contact-recovery-support-floor-delta", type=float, default=None, help="Temporarily increase support-floor ratio while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-z-pos-gain-delta", type=float, default=None, help="Temporarily increase base-height gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-roll-angle-gain-delta", type=float, default=None, help="Temporarily increase roll-angle gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-roll-rate-gain-delta", type=float, default=None, help="Temporarily increase roll-rate gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-pitch-angle-gain-delta", type=float, default=None, help="Temporarily increase pitch-angle gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-pitch-rate-gain-delta", type=float, default=None, help="Temporarily increase pitch-rate gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-side-rebalance-delta", type=float, default=None, help="Temporarily increase signed side-rebalance gain while late full-contact recovery is active.")
-    parser.add_argument("--full-contact-recovery-allcontact-release-tail-s", type=float, default=None, help="Once all four feet and rear seam states are recovered again, cap the remaining late full-contact recovery hold to this short tail.")
-    parser.add_argument("--crawl-front-delayed-swing-recovery-hold-s", type=float, default=None, help="In crawl, briefly keep late full-contact recovery alive when a front leg is nominally opening swing but is still actually/load-bearing in stance.")
-    parser.add_argument("--crawl-front-delayed-swing-recovery-margin-threshold", type=float, default=None, help="Only extend crawl delayed front-swing recovery while the planned-swing front leg still has support margin at or below this threshold.")
-    parser.add_argument("--crawl-front-delayed-swing-recovery-once-per-swing", dest="crawl_front_delayed_swing_recovery_once_per_swing", action="store_true", default=None, help="Allow delayed front-swing recovery to extend late full-contact recovery at most once per continuous front planned-swing window.")
-    parser.add_argument("--no-crawl-front-delayed-swing-recovery-once-per-swing", dest="crawl_front_delayed_swing_recovery_once_per_swing", action="store_false", help="Allow delayed front-swing recovery to rearm multiple times within the same front planned-swing window.")
-    parser.add_argument("--crawl-front-delayed-swing-recovery-release-tail-s", type=float, default=None, help="Once the planned-swing front leg has recovered support margin above the delayed-recovery threshold, cap the remaining late full-contact recovery hold to this short tail.")
-    parser.add_argument("--crawl-front-delayed-swing-recovery-rearm-trigger-s", type=float, default=None, help="Only re-arm crawl delayed front-swing recovery when the remaining late full-contact recovery time is at or below this threshold.")
-    parser.add_argument("--crawl-front-planted-swing-recovery-hold-s", type=float, default=None, help="In crawl, re-arm a short late full-contact recovery tail when a front leg is nominally in swing but is still physically planted near the end of recovery.")
-    parser.add_argument("--crawl-front-planted-swing-recovery-margin-threshold", type=float, default=None, help="Only re-arm the planted-front-swing recovery tail while the planted planned-swing front leg support margin stays at or below this threshold.")
-    parser.add_argument("--crawl-front-planted-swing-recovery-height-ratio", type=float, default=None, help="Only re-arm the planted-front-swing recovery tail while base height stays below this ratio of ref_z.")
-    parser.add_argument("--crawl-front-planted-swing-recovery-roll-threshold", type=float, default=None, help="Optional abs roll threshold in radians required before the planted-front-swing recovery tail may arm.")
-    parser.add_argument("--crawl-front-planted-swing-recovery-rearm-trigger-s", type=float, default=None, help="Only re-arm the planted-front-swing recovery tail once the existing full-contact recovery hold has decayed below this remaining time.")
-    parser.add_argument("--crawl-front-planted-postdrop-recovery-hold-s", type=float, default=None, help="In crawl, re-arm a short late full-contact recovery chunk right after recovery drops if the same front planned-swing leg is still planted.")
-    parser.add_argument("--crawl-front-planted-seam-support-hold-s", type=float, default=None, help="In crawl, keep a short dedicated support window alive when a front leg is planned swing but still planted during the low-height seam.")
-    parser.add_argument("--crawl-front-stance-support-tail-hold-s", type=float, default=None, help="In crawl, keep the remaining front stance leg on touchdown-style support briefly after the opposite front leg actually opens swing.")
-    parser.add_argument("--crawl-front-close-gap-support-hold-s", type=float, default=None, help="In crawl, keep the front stance-support tail alive while a front leg has already re-closed planned/current stance but actual contact has not yet returned.")
-    parser.add_argument("--crawl-front-close-gap-keep-swing", type=int, choices=[0, 1], default=None, help="In crawl, keep a returning front leg on the swing side while planned/current stance has re-closed but actual contact has not yet returned.")
-    parser.add_argument("--crawl-front-late-rearm-tail-hold-s", type=float, default=None, help="In crawl, re-arm a very short front stance-support tail after the original tail has expired but the same front swing is still sagging.")
-    parser.add_argument("--crawl-front-late-rearm-budget-s", type=float, default=None, help="Maximum total extra late-rearm support budget that can be consumed within one continuous front planned-swing window.")
-    parser.add_argument("--crawl-front-late-rearm-min-swing-time-s", type=float, default=None, help="Minimum front swing elapsed time before the late crawl tail re-arm may fire.")
-    parser.add_argument("--crawl-front-late-rearm-min-negative-margin", type=float, default=None, help="Require the still-swinging front leg support margin to stay below -this value before the late crawl tail re-arm may fire.")
+    add_crawl_recovery_cli_args(parser)
     parser.add_argument("--z-pos-gain", type=float, default=None, help="Base-height error gain used in the desired vertical force heuristic.")
     parser.add_argument("--z-vel-gain", type=float, default=None, help="Vertical velocity error gain used in the desired vertical force heuristic.")
     parser.add_argument("--min-vertical-force-scale", type=float, default=None, help="Minimum desired total vertical force as a fraction of body weight.")
@@ -664,7 +640,6 @@ def main() -> None:
                 "pre_swing_lookahead_steps": 3,
             }
             if args.gait == "crawl":
-                from simulation.crawl_preset import crawl_conservative_params
                 conservative_params.update(crawl_conservative_params())
             if args.gait in {"trot", "pace", "bound"}:
                 conservative_params.update(_dynamic_gait_profile_for(args.gait))
@@ -1430,140 +1405,7 @@ def main() -> None:
             cfg.linear_osqp_params["rear_swing_release_forward_scale"] = float(
                 max(min(args.rear_swing_release_forward_scale, 1.0), 0.0)
             )
-        if args.full_contact_recovery_hold_s is not None:
-            cfg.linear_osqp_params["full_contact_recovery_hold_s"] = max(float(args.full_contact_recovery_hold_s), 0.0)
-        if args.full_contact_recovery_forward_scale is not None:
-            cfg.linear_osqp_params["full_contact_recovery_forward_scale"] = float(
-                max(min(args.full_contact_recovery_forward_scale, 1.0), 0.0)
-            )
-        if args.full_contact_recovery_roll_threshold is not None:
-            cfg.linear_osqp_params["full_contact_recovery_roll_threshold"] = max(
-                float(args.full_contact_recovery_roll_threshold), 0.0
-            )
-        if args.full_contact_recovery_pitch_threshold is not None:
-            cfg.linear_osqp_params["full_contact_recovery_pitch_threshold"] = max(
-                float(args.full_contact_recovery_pitch_threshold), 0.0
-            )
-        if args.full_contact_recovery_height_ratio is not None:
-            cfg.linear_osqp_params["full_contact_recovery_height_ratio"] = max(
-                float(args.full_contact_recovery_height_ratio), 0.0
-            )
-        if args.full_contact_recovery_recent_window_s is not None:
-            cfg.linear_osqp_params["full_contact_recovery_recent_window_s"] = max(
-                float(args.full_contact_recovery_recent_window_s), 0.0
-            )
-        if args.full_contact_recovery_rear_support_scale is not None:
-            cfg.linear_osqp_params["full_contact_recovery_rear_support_scale"] = float(
-                max(min(args.full_contact_recovery_rear_support_scale, 1.0), 0.0)
-            )
-        if args.full_contact_recovery_support_floor_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_support_floor_delta"] = max(
-                float(args.full_contact_recovery_support_floor_delta), 0.0
-            )
-        if args.full_contact_recovery_z_pos_gain_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_z_pos_gain_delta"] = max(
-                float(args.full_contact_recovery_z_pos_gain_delta), 0.0
-            )
-        if args.full_contact_recovery_roll_angle_gain_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_roll_angle_gain_delta"] = max(
-                float(args.full_contact_recovery_roll_angle_gain_delta), 0.0
-            )
-        if args.full_contact_recovery_roll_rate_gain_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_roll_rate_gain_delta"] = max(
-                float(args.full_contact_recovery_roll_rate_gain_delta), 0.0
-            )
-        if args.full_contact_recovery_pitch_angle_gain_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_pitch_angle_gain_delta"] = max(
-                float(args.full_contact_recovery_pitch_angle_gain_delta), 0.0
-            )
-        if args.full_contact_recovery_pitch_rate_gain_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_pitch_rate_gain_delta"] = max(
-                float(args.full_contact_recovery_pitch_rate_gain_delta), 0.0
-            )
-        if args.full_contact_recovery_side_rebalance_delta is not None:
-            cfg.linear_osqp_params["full_contact_recovery_side_rebalance_delta"] = max(
-                float(args.full_contact_recovery_side_rebalance_delta), 0.0
-            )
-        if args.full_contact_recovery_allcontact_release_tail_s is not None:
-            cfg.linear_osqp_params["full_contact_recovery_allcontact_release_tail_s"] = max(
-                float(args.full_contact_recovery_allcontact_release_tail_s), 0.0
-            )
-        if args.crawl_front_delayed_swing_recovery_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_hold_s"] = max(
-                float(args.crawl_front_delayed_swing_recovery_hold_s), 0.0
-            )
-        if args.crawl_front_delayed_swing_recovery_margin_threshold is not None:
-            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_margin_threshold"] = float(
-                args.crawl_front_delayed_swing_recovery_margin_threshold
-            )
-        if args.crawl_front_delayed_swing_recovery_once_per_swing is not None:
-            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_once_per_swing"] = bool(
-                args.crawl_front_delayed_swing_recovery_once_per_swing
-            )
-        if args.crawl_front_delayed_swing_recovery_release_tail_s is not None:
-            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_release_tail_s"] = max(
-                float(args.crawl_front_delayed_swing_recovery_release_tail_s), 0.0
-            )
-        if args.crawl_front_delayed_swing_recovery_rearm_trigger_s is not None:
-            cfg.linear_osqp_params["crawl_front_delayed_swing_recovery_rearm_trigger_s"] = max(
-                float(args.crawl_front_delayed_swing_recovery_rearm_trigger_s), 0.0
-            )
-        if args.crawl_front_planted_swing_recovery_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_planted_swing_recovery_hold_s"] = max(
-                float(args.crawl_front_planted_swing_recovery_hold_s), 0.0
-            )
-        if args.crawl_front_planted_swing_recovery_margin_threshold is not None:
-            cfg.linear_osqp_params["crawl_front_planted_swing_recovery_margin_threshold"] = float(
-                args.crawl_front_planted_swing_recovery_margin_threshold
-            )
-        if args.crawl_front_planted_swing_recovery_height_ratio is not None:
-            cfg.linear_osqp_params["crawl_front_planted_swing_recovery_height_ratio"] = max(
-                float(args.crawl_front_planted_swing_recovery_height_ratio), 0.0
-            )
-        if args.crawl_front_planted_swing_recovery_roll_threshold is not None:
-            cfg.linear_osqp_params["crawl_front_planted_swing_recovery_roll_threshold"] = max(
-                float(args.crawl_front_planted_swing_recovery_roll_threshold), 0.0
-            )
-        if args.crawl_front_planted_swing_recovery_rearm_trigger_s is not None:
-            cfg.linear_osqp_params["crawl_front_planted_swing_recovery_rearm_trigger_s"] = max(
-                float(args.crawl_front_planted_swing_recovery_rearm_trigger_s), 0.0
-            )
-        if args.crawl_front_planted_postdrop_recovery_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_planted_postdrop_recovery_hold_s"] = max(
-                float(args.crawl_front_planted_postdrop_recovery_hold_s), 0.0
-            )
-        if args.crawl_front_planted_seam_support_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_planted_seam_support_hold_s"] = max(
-                float(args.crawl_front_planted_seam_support_hold_s), 0.0
-            )
-        if args.crawl_front_stance_support_tail_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_stance_support_tail_hold_s"] = max(
-                float(args.crawl_front_stance_support_tail_hold_s), 0.0
-            )
-        if args.crawl_front_close_gap_support_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_close_gap_support_hold_s"] = max(
-                float(args.crawl_front_close_gap_support_hold_s), 0.0
-            )
-        if args.crawl_front_close_gap_keep_swing is not None:
-            cfg.linear_osqp_params["crawl_front_close_gap_keep_swing"] = bool(
-                int(args.crawl_front_close_gap_keep_swing)
-            )
-        if args.crawl_front_late_rearm_tail_hold_s is not None:
-            cfg.linear_osqp_params["crawl_front_late_rearm_tail_hold_s"] = max(
-                float(args.crawl_front_late_rearm_tail_hold_s), 0.0
-            )
-        if args.crawl_front_late_rearm_budget_s is not None:
-            cfg.linear_osqp_params["crawl_front_late_rearm_budget_s"] = max(
-                float(args.crawl_front_late_rearm_budget_s), 0.0
-            )
-        if args.crawl_front_late_rearm_min_swing_time_s is not None:
-            cfg.linear_osqp_params["crawl_front_late_rearm_min_swing_time_s"] = max(
-                float(args.crawl_front_late_rearm_min_swing_time_s), 0.0
-            )
-        if args.crawl_front_late_rearm_min_negative_margin is not None:
-            cfg.linear_osqp_params["crawl_front_late_rearm_min_negative_margin"] = max(
-                float(args.crawl_front_late_rearm_min_negative_margin), 0.0
-            )
+        apply_crawl_recovery_cli_overrides(args, cfg.linear_osqp_params)
         if args.pre_swing_gate_hold_s is not None:
             cfg.linear_osqp_params["pre_swing_gate_hold_s"] = max(float(args.pre_swing_gate_hold_s), 0.0)
         if args.rear_pre_swing_gate_hold_s is not None:
