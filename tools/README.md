@@ -1,19 +1,12 @@
 # Tools Layout
 
-Helper scripts are grouped by purpose.
+The active tools tree is intentionally small.
 
-## Folders
+## Active contents
 
-- `analysis/`
-  - one-off inspection helpers for existing outputs
 - `launchers/`
-  - shell launch scripts for longer runs
-  - also includes fixed benchmark-suite runners such as
+  - benchmark and reproducibility entry points such as
     `run_trot_benchmark_suite.py`
-- `report_assets/`
-  - scripts that generate figures, GIFs, MP4s, and docx report assets
-- `stock_helpers/`
-  - stock-stack-specific helper scripts
 
 Older temporary sweep scripts were moved out of the active tools tree and are
 now kept under:
@@ -22,5 +15,5 @@ now kept under:
 
 ## Rule
 
-- Put new helper scripts into one of these subfolders instead of leaving them
-  loose under `tools/`.
+- Keep only reusable launchers under `tools/`.
+- Put one-off experiments and temporary sweeps under `archive/`, not here.
