@@ -331,6 +331,35 @@ def add_crawl_allcontact_cli_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--front-rear-transition-guard-margin-release", type=float, default=None, help="Allow the front rear-transition guard to collapse early only after the front support margin itself has recovered above this threshold.")
 
 
+def add_crawl_support_bridge_cli_args(parser: argparse.ArgumentParser) -> None:
+    """Register crawl-only touchdown-support and bridge tuning arguments."""
+    parser.add_argument("--touchdown-contact-vel-z-damping", type=float, default=None, help="Task-space vertical damping applied during touchdown support windows.")
+    parser.add_argument("--front-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional front-leg override for touchdown support vertical damping.")
+    parser.add_argument("--rear-touchdown-contact-vel-z-damping", type=float, default=None, help="Optional rear-leg override for touchdown support vertical damping.")
+    parser.add_argument("--front-margin-rescue-hold-s", type=float, default=None, help="Keep a brief late front-leg support rescue alive during unstable full-contact stance.")
+    parser.add_argument("--front-margin-rescue-forward-scale", type=float, default=None, help="Scale forward reference velocity while late front-margin rescue is active.")
+    parser.add_argument("--front-margin-rescue-min-margin", type=float, default=None, help="Trigger late front-margin rescue when the queried front support margin falls below this value.")
+    parser.add_argument("--front-margin-rescue-margin-gap", type=float, default=None, help="Require the rescued front leg margin to be this much worse than the opposite front leg.")
+    parser.add_argument("--front-margin-rescue-alpha-margin", type=float, default=None, help="Support alpha reaches 1 when the rescued front margin falls this far below the trigger threshold.")
+    parser.add_argument("--front-margin-rescue-roll-threshold", type=float, default=None, help="Absolute roll threshold in radians required before late front-margin rescue may trigger.")
+    parser.add_argument("--front-margin-rescue-pitch-threshold", type=float, default=None, help="Absolute pitch threshold in radians required before late front-margin rescue may trigger.")
+    parser.add_argument("--front-margin-rescue-height-ratio", type=float, default=None, help="Trigger late front-margin rescue when base height falls below this ratio of ref_z.")
+    parser.add_argument("--front-margin-rescue-recent-swing-window-s", type=float, default=None, help="Require that the same front leg swung within this recent window before late front-margin rescue may trigger.")
+    parser.add_argument("--rear-handoff-support-hold-s", type=float, default=None, help="Keep front touchdown-style support alive briefly when a rear swing is about to start.")
+    parser.add_argument("--rear-handoff-forward-scale", type=float, default=None, help="Scale forward reference velocity while the rear-handoff support extension is active.")
+    parser.add_argument("--rear-handoff-lookahead-steps", type=int, default=None, help="How many horizon steps ahead to inspect for an upcoming rear swing before extending front touchdown support.")
+    parser.add_argument("--rear-handoff-support-rear-alpha-scale", type=float, default=None, help="Blend in this much rear touchdown-support alpha during rear handoff support once only one rear stance leg remains.")
+    parser.add_argument("--rear-swing-bridge-hold-s", type=float, default=None, help="Keep front touchdown-style support alive briefly into the late rear swing transition.")
+    parser.add_argument("--rear-swing-bridge-forward-scale", type=float, default=None, help="Scale forward reference velocity while the rear-swing bridge is active.")
+    parser.add_argument("--rear-swing-bridge-roll-threshold", type=float, default=None, help="Absolute roll threshold in radians that can trigger the rear-swing bridge.")
+    parser.add_argument("--rear-swing-bridge-pitch-threshold", type=float, default=None, help="Absolute pitch threshold in radians that can trigger the rear-swing bridge.")
+    parser.add_argument("--rear-swing-bridge-height-ratio", type=float, default=None, help="Trigger the rear-swing bridge if base height falls below this ratio of ref_z.")
+    parser.add_argument("--rear-swing-bridge-recent-front-window-s", type=float, default=None, help="Require that front touchdown support happened within this recent time window before rear-swing bridging.")
+    parser.add_argument("--rear-swing-bridge-lookahead-steps", type=int, default=None, help="How many horizon steps ahead to inspect for an upcoming rear swing when bridging support.")
+    parser.add_argument("--rear-swing-bridge-allcontact-release-tail-s", type=float, default=None, help="Once the rear seam has fully closed again, cap the remaining rear-swing bridge hold to this short tail.")
+    parser.add_argument("--rear-swing-bridge-rear-alpha-scale", type=float, default=None, help="Blend in this much rear touchdown-support alpha during the rear-swing bridge once only one rear stance leg remains.")
+
+
 def apply_crawl_recovery_cli_overrides(args: argparse.Namespace, params: dict) -> None:
     """Apply crawl-only late-recovery CLI overrides into linear_osqp_params."""
     if args.full_contact_recovery_hold_s is not None:
@@ -638,4 +667,98 @@ def apply_crawl_allcontact_cli_overrides(args: argparse.Namespace, params: dict)
     if args.front_rear_transition_guard_margin_release is not None:
         params["front_rear_transition_guard_margin_release"] = max(
             float(args.front_rear_transition_guard_margin_release), 0.0
+        )
+
+
+def apply_crawl_support_bridge_cli_overrides(args: argparse.Namespace, params: dict) -> None:
+    """Apply crawl-only touchdown-support and bridge overrides."""
+    if args.touchdown_contact_vel_z_damping is not None:
+        params["touchdown_contact_vel_z_damping"] = max(
+            float(args.touchdown_contact_vel_z_damping), 0.0
+        )
+    if args.front_touchdown_contact_vel_z_damping is not None:
+        params["front_touchdown_contact_vel_z_damping"] = max(
+            float(args.front_touchdown_contact_vel_z_damping), 0.0
+        )
+    if args.rear_touchdown_contact_vel_z_damping is not None:
+        params["rear_touchdown_contact_vel_z_damping"] = max(
+            float(args.rear_touchdown_contact_vel_z_damping), 0.0
+        )
+    if args.front_margin_rescue_hold_s is not None:
+        params["front_margin_rescue_hold_s"] = max(float(args.front_margin_rescue_hold_s), 0.0)
+    if args.front_margin_rescue_forward_scale is not None:
+        params["front_margin_rescue_forward_scale"] = float(
+            max(min(args.front_margin_rescue_forward_scale, 1.0), 0.0)
+        )
+    if args.front_margin_rescue_min_margin is not None:
+        params["front_margin_rescue_min_margin"] = float(args.front_margin_rescue_min_margin)
+    if args.front_margin_rescue_margin_gap is not None:
+        params["front_margin_rescue_margin_gap"] = max(
+            float(args.front_margin_rescue_margin_gap), 0.0
+        )
+    if args.front_margin_rescue_alpha_margin is not None:
+        params["front_margin_rescue_alpha_margin"] = max(
+            float(args.front_margin_rescue_alpha_margin), 1e-6
+        )
+    if args.front_margin_rescue_roll_threshold is not None:
+        params["front_margin_rescue_roll_threshold"] = max(
+            float(args.front_margin_rescue_roll_threshold), 0.0
+        )
+    if args.front_margin_rescue_pitch_threshold is not None:
+        params["front_margin_rescue_pitch_threshold"] = max(
+            float(args.front_margin_rescue_pitch_threshold), 0.0
+        )
+    if args.front_margin_rescue_height_ratio is not None:
+        params["front_margin_rescue_height_ratio"] = max(
+            float(args.front_margin_rescue_height_ratio), 0.0
+        )
+    if args.front_margin_rescue_recent_swing_window_s is not None:
+        params["front_margin_rescue_recent_swing_window_s"] = max(
+            float(args.front_margin_rescue_recent_swing_window_s), 0.0
+        )
+    if args.rear_handoff_support_hold_s is not None:
+        params["rear_handoff_support_hold_s"] = max(float(args.rear_handoff_support_hold_s), 0.0)
+    if args.rear_handoff_forward_scale is not None:
+        params["rear_handoff_forward_scale"] = float(
+            max(min(args.rear_handoff_forward_scale, 1.0), 0.0)
+        )
+    if args.rear_handoff_lookahead_steps is not None:
+        params["rear_handoff_lookahead_steps"] = max(int(args.rear_handoff_lookahead_steps), 1)
+    if args.rear_handoff_support_rear_alpha_scale is not None:
+        params["rear_handoff_support_rear_alpha_scale"] = float(
+            max(min(args.rear_handoff_support_rear_alpha_scale, 1.0), 0.0)
+        )
+    if args.rear_swing_bridge_hold_s is not None:
+        params["rear_swing_bridge_hold_s"] = max(float(args.rear_swing_bridge_hold_s), 0.0)
+    if args.rear_swing_bridge_forward_scale is not None:
+        params["rear_swing_bridge_forward_scale"] = float(
+            max(min(args.rear_swing_bridge_forward_scale, 1.0), 0.0)
+        )
+    if args.rear_swing_bridge_roll_threshold is not None:
+        params["rear_swing_bridge_roll_threshold"] = max(
+            float(args.rear_swing_bridge_roll_threshold), 0.0
+        )
+    if args.rear_swing_bridge_pitch_threshold is not None:
+        params["rear_swing_bridge_pitch_threshold"] = max(
+            float(args.rear_swing_bridge_pitch_threshold), 0.0
+        )
+    if args.rear_swing_bridge_height_ratio is not None:
+        params["rear_swing_bridge_height_ratio"] = max(
+            float(args.rear_swing_bridge_height_ratio), 0.0
+        )
+    if args.rear_swing_bridge_recent_front_window_s is not None:
+        params["rear_swing_bridge_recent_front_window_s"] = max(
+            float(args.rear_swing_bridge_recent_front_window_s), 0.0
+        )
+    if args.rear_swing_bridge_lookahead_steps is not None:
+        params["rear_swing_bridge_lookahead_steps"] = max(
+            int(args.rear_swing_bridge_lookahead_steps), 1
+        )
+    if args.rear_swing_bridge_allcontact_release_tail_s is not None:
+        params["rear_swing_bridge_allcontact_release_tail_s"] = max(
+            float(args.rear_swing_bridge_allcontact_release_tail_s), 0.0
+        )
+    if args.rear_swing_bridge_rear_alpha_scale is not None:
+        params["rear_swing_bridge_rear_alpha_scale"] = float(
+            max(min(args.rear_swing_bridge_rear_alpha_scale, 1.0), 0.0)
         )
