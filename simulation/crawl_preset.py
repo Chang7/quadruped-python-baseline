@@ -284,6 +284,53 @@ def add_crawl_recovery_cli_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--crawl-front-late-rearm-min-negative-margin", type=float, default=None, help="Require the still-swinging front leg support margin to stay below -this value before the late crawl tail re-arm may fire.")
 
 
+def add_crawl_allcontact_cli_args(parser: argparse.ArgumentParser) -> None:
+    """Register crawl-only rear all-contact stabilization tuning arguments."""
+    parser.add_argument("--rear-all-contact-stabilization-hold-s", type=float, default=None, help="Rear-only late all-contact stabilization hold after a rear leg closes back into stance.")
+    parser.add_argument("--rear-all-contact-stabilization-forward-scale", type=float, default=None, help="Forward-command scale while rear-only late all-contact stabilization is active.")
+    parser.add_argument("--rear-all-contact-stabilization-front-alpha-scale", type=float, default=None, help="Clamp front touchdown-support alpha while rear-only late all-contact stabilization is active.")
+    parser.add_argument("--rear-all-contact-stabilization-height-ratio", type=float, default=None, help="Enable rear-only late all-contact stabilization while base height ratio stays below this value.")
+    parser.add_argument("--rear-all-contact-stabilization-roll-threshold", type=float, default=None, help="Enable rear-only late all-contact stabilization when |roll| exceeds this threshold.")
+    parser.add_argument("--rear-all-contact-stabilization-pitch-threshold", type=float, default=None, help="Enable rear-only late all-contact stabilization when |pitch| exceeds this threshold.")
+    parser.add_argument("--rear-late-seam-support-trigger-s", type=float, default=None, help="If a rear leg is already planned back in stance but controller-side contact is still open, wait this long before starting the late all-contact support window.")
+    parser.add_argument("--rear-close-handoff-hold-s", type=float, default=None, help="Keep a short rear-leg handoff window alive right after a late planned-stance/current-contact close.")
+    parser.add_argument("--rear-close-handoff-leg-floor-scale-delta", type=float, default=None, help="Temporarily raise the newly-closed rear leg vertical-load floor during the rear close-handoff window.")
+    parser.add_argument("--rear-late-load-share-support-hold-s", type=float, default=None, help="Experimental asymmetric rear support hold [s] for the weaker rear leg during low-height crawl all-contact stance.")
+    parser.add_argument("--rear-late-load-share-support-min-leg-share", type=float, default=None, help="Experimental minimum weaker-rear-leg share within the rear pair that triggers the asymmetric late rear support path.")
+    parser.add_argument("--rear-late-load-share-support-height-ratio", type=float, default=None, help="Only arm the experimental late rear load-share support if base height is below this ratio of ref_z.")
+    parser.add_argument("--rear-late-load-share-support-min-persist-s", type=float, default=None, help="Require the experimental weak-rear-leg condition to persist this long before late asymmetric rear support arms.")
+    parser.add_argument("--rear-late-load-share-support-alpha-cap", type=float, default=None, help="Cap the experimental late asymmetric rear support alpha after persistence gating.")
+    parser.add_argument("--rear-late-load-share-support-leg-floor-scale-delta", type=float, default=None, help="Temporarily raise only the weaker rear leg vertical-load floor during the late asymmetric rear support window.")
+    parser.add_argument("--rear-all-contact-stabilization-min-rear-load-share", type=float, default=None, help="Keep rear-only late all-contact stabilization alive while total rear vertical load share stays below this fraction.")
+    parser.add_argument("--rear-all-contact-stabilization-min-rear-leg-load-share", type=float, default=None, help="Keep rear-only late all-contact stabilization alive while the active rear leg load share stays below this fraction.")
+    parser.add_argument("--rear-all-contact-stabilization-weak-leg-share-ref", type=float, default=None, help="During rear late all-contact stabilization, treat the weaker rear leg as under-supported below this rear-pair load-share fraction.")
+    parser.add_argument("--rear-all-contact-stabilization-weak-leg-floor-delta", type=float, default=None, help="During rear late all-contact stabilization, temporarily raise only the weaker rear leg vertical-load floor by this scale.")
+    parser.add_argument("--rear-all-contact-stabilization-weak-leg-height-ratio", type=float, default=None, help="Optional extra height-ratio gate for the weaker rear leg floor boost during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-weak-leg-tail-only", action="store_true", help="Only allow the weaker rear leg floor boost during the posture-only rear all-contact tail.")
+    parser.add_argument("--crawl-front-planted-weak-rear-share-ref", type=float, default=None, help="During the narrow crawl front-planted seam, treat the weaker rear leg as under-supported below this rear-pair load-share fraction.")
+    parser.add_argument("--crawl-front-planted-weak-rear-alpha-cap", type=float, default=None, help="Cap the dedicated front-planted weak-rear support alpha.")
+    parser.add_argument("--rear-all-contact-stabilization-retrigger-limit", type=int, default=None, help="Allow this many late all-contact stabilization renewals after the initial rear touchdown trigger.")
+    parser.add_argument("--rear-all-contact-stabilization-rear-floor-delta", type=float, default=None, help="Temporarily increase rear-load floor only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-z-pos-gain-delta", type=float, default=None, help="Temporarily increase base-height gain only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-roll-angle-gain-delta", type=float, default=None, help="Temporarily increase roll-angle gain only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-roll-rate-gain-delta", type=float, default=None, help="Temporarily increase roll-rate gain only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-side-rebalance-delta", type=float, default=None, help="Temporarily increase left/right load rebalance only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-front-anchor-z-blend", type=float, default=None, help="Blend front stance-foot target z toward the actual contacted foot height only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-rear-anchor-z-blend", type=float, default=None, help="Optional rear-leg counterpart for late all-contact stance z blending.")
+    parser.add_argument("--rear-all-contact-stabilization-front-anchor-z-max-delta", type=float, default=None, help="Cap front stance-foot target z at actual z plus this margin only during rear late all-contact stabilization.")
+    parser.add_argument("--rear-all-contact-stabilization-rear-anchor-z-max-delta", type=float, default=None, help="Optional rear-leg counterpart for late all-contact stance z capping.")
+    parser.add_argument("--rear-all-contact-post-recovery-tail-hold-s", type=float, default=None, help="After late full-contact recovery ends, keep rear all-contact stabilization alive for this short tail if posture is still poor.")
+    parser.add_argument("--rear-all-contact-release-tail-alpha-scale", type=float, default=None, help="Scale the short posture-only tail applied when rear all-contact stabilization drops out while posture is still poor.")
+    parser.add_argument("--rear-all-contact-post-recovery-front-late-alpha-scale", type=float, default=None, help="When the post-recovery posture tail is triggered only by the late front seam, scale its rear all-contact alpha by this factor.")
+    parser.add_argument("--front-rear-transition-guard-hold-s", type=float, default=None, help="Keep a brief front pre-swing guard alive after a rear transition seam starts to settle.")
+    parser.add_argument("--front-rear-transition-guard-forward-scale", type=float, default=None, help="Scale forward reference velocity while the front rear-transition guard is active.")
+    parser.add_argument("--front-rear-transition-guard-roll-threshold", type=float, default=None, help="Absolute roll threshold in radians that can trigger the front rear-transition guard.")
+    parser.add_argument("--front-rear-transition-guard-pitch-threshold", type=float, default=None, help="Absolute pitch threshold in radians that can trigger the front rear-transition guard.")
+    parser.add_argument("--front-rear-transition-guard-height-ratio", type=float, default=None, help="Trigger the front rear-transition guard if base height falls below this ratio of ref_z.")
+    parser.add_argument("--front-rear-transition-guard-release-tail-s", type=float, default=None, help="Once the rear seam is protected again, cap the remaining front rear-transition guard hold to this short tail [s].")
+    parser.add_argument("--front-rear-transition-guard-margin-release", type=float, default=None, help="Allow the front rear-transition guard to collapse early only after the front support margin itself has recovered above this threshold.")
+
+
 def apply_crawl_recovery_cli_overrides(args: argparse.Namespace, params: dict) -> None:
     """Apply crawl-only late-recovery CLI overrides into linear_osqp_params."""
     if args.full_contact_recovery_hold_s is not None:
@@ -417,4 +464,178 @@ def apply_crawl_recovery_cli_overrides(args: argparse.Namespace, params: dict) -
     if args.crawl_front_late_rearm_min_negative_margin is not None:
         params["crawl_front_late_rearm_min_negative_margin"] = max(
             float(args.crawl_front_late_rearm_min_negative_margin), 0.0
+        )
+
+
+def apply_crawl_allcontact_cli_overrides(args: argparse.Namespace, params: dict) -> None:
+    """Apply crawl-only rear all-contact stabilization overrides."""
+    if args.rear_all_contact_stabilization_hold_s is not None:
+        params["rear_all_contact_stabilization_hold_s"] = max(
+            float(args.rear_all_contact_stabilization_hold_s), 0.0
+        )
+    if args.rear_all_contact_stabilization_forward_scale is not None:
+        params["rear_all_contact_stabilization_forward_scale"] = float(
+            max(min(args.rear_all_contact_stabilization_forward_scale, 1.0), 0.0)
+        )
+    if args.rear_all_contact_stabilization_front_alpha_scale is not None:
+        params["rear_all_contact_stabilization_front_alpha_scale"] = float(
+            max(min(args.rear_all_contact_stabilization_front_alpha_scale, 1.0), 0.0)
+        )
+    if args.rear_all_contact_stabilization_height_ratio is not None:
+        params["rear_all_contact_stabilization_height_ratio"] = max(
+            float(args.rear_all_contact_stabilization_height_ratio), 0.0
+        )
+    if args.rear_all_contact_stabilization_roll_threshold is not None:
+        params["rear_all_contact_stabilization_roll_threshold"] = max(
+            float(args.rear_all_contact_stabilization_roll_threshold), 0.0
+        )
+    if args.rear_all_contact_stabilization_pitch_threshold is not None:
+        params["rear_all_contact_stabilization_pitch_threshold"] = max(
+            float(args.rear_all_contact_stabilization_pitch_threshold), 0.0
+        )
+    if args.rear_late_seam_support_trigger_s is not None:
+        params["rear_late_seam_support_trigger_s"] = max(
+            float(args.rear_late_seam_support_trigger_s), 0.0
+        )
+    if args.rear_close_handoff_hold_s is not None:
+        params["rear_close_handoff_hold_s"] = max(
+            float(args.rear_close_handoff_hold_s), 0.0
+        )
+    if args.rear_close_handoff_leg_floor_scale_delta is not None:
+        params["rear_close_handoff_leg_floor_scale_delta"] = max(
+            float(args.rear_close_handoff_leg_floor_scale_delta), 0.0
+        )
+    if args.rear_late_load_share_support_hold_s is not None:
+        params["rear_late_load_share_support_hold_s"] = max(
+            float(args.rear_late_load_share_support_hold_s), 0.0
+        )
+    if args.rear_late_load_share_support_min_leg_share is not None:
+        params["rear_late_load_share_support_min_leg_share"] = max(
+            float(args.rear_late_load_share_support_min_leg_share), 0.0
+        )
+    if args.rear_late_load_share_support_height_ratio is not None:
+        params["rear_late_load_share_support_height_ratio"] = max(
+            float(args.rear_late_load_share_support_height_ratio), 0.0
+        )
+    if args.rear_late_load_share_support_min_persist_s is not None:
+        params["rear_late_load_share_support_min_persist_s"] = max(
+            float(args.rear_late_load_share_support_min_persist_s), 0.0
+        )
+    if args.rear_late_load_share_support_alpha_cap is not None:
+        params["rear_late_load_share_support_alpha_cap"] = float(
+            max(min(float(args.rear_late_load_share_support_alpha_cap), 1.0), 0.0)
+        )
+    if args.rear_late_load_share_support_leg_floor_scale_delta is not None:
+        params["rear_late_load_share_support_leg_floor_scale_delta"] = max(
+            float(args.rear_late_load_share_support_leg_floor_scale_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_min_rear_load_share is not None:
+        params["rear_all_contact_stabilization_min_rear_load_share"] = max(
+            float(args.rear_all_contact_stabilization_min_rear_load_share), 0.0
+        )
+    if args.rear_all_contact_stabilization_min_rear_leg_load_share is not None:
+        params["rear_all_contact_stabilization_min_rear_leg_load_share"] = max(
+            float(args.rear_all_contact_stabilization_min_rear_leg_load_share), 0.0
+        )
+    if args.rear_all_contact_stabilization_weak_leg_share_ref is not None:
+        params["rear_all_contact_stabilization_weak_leg_share_ref"] = max(
+            float(args.rear_all_contact_stabilization_weak_leg_share_ref), 0.0
+        )
+    if args.rear_all_contact_stabilization_weak_leg_floor_delta is not None:
+        params["rear_all_contact_stabilization_weak_leg_floor_delta"] = max(
+            float(args.rear_all_contact_stabilization_weak_leg_floor_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_weak_leg_height_ratio is not None:
+        params["rear_all_contact_stabilization_weak_leg_height_ratio"] = max(
+            float(args.rear_all_contact_stabilization_weak_leg_height_ratio), 0.0
+        )
+    if args.rear_all_contact_stabilization_weak_leg_tail_only:
+        params["rear_all_contact_stabilization_weak_leg_tail_only"] = True
+    if args.crawl_front_planted_weak_rear_share_ref is not None:
+        params["crawl_front_planted_weak_rear_share_ref"] = max(
+            float(args.crawl_front_planted_weak_rear_share_ref), 0.0
+        )
+    if args.crawl_front_planted_weak_rear_alpha_cap is not None:
+        params["crawl_front_planted_weak_rear_alpha_cap"] = float(
+            max(min(float(args.crawl_front_planted_weak_rear_alpha_cap), 1.0), 0.0)
+        )
+    if args.rear_all_contact_stabilization_retrigger_limit is not None:
+        params["rear_all_contact_stabilization_retrigger_limit"] = max(
+            int(args.rear_all_contact_stabilization_retrigger_limit), 0
+        )
+    if args.rear_all_contact_stabilization_rear_floor_delta is not None:
+        params["rear_all_contact_stabilization_rear_floor_delta"] = max(
+            float(args.rear_all_contact_stabilization_rear_floor_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_z_pos_gain_delta is not None:
+        params["rear_all_contact_stabilization_z_pos_gain_delta"] = max(
+            float(args.rear_all_contact_stabilization_z_pos_gain_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_roll_angle_gain_delta is not None:
+        params["rear_all_contact_stabilization_roll_angle_gain_delta"] = max(
+            float(args.rear_all_contact_stabilization_roll_angle_gain_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_roll_rate_gain_delta is not None:
+        params["rear_all_contact_stabilization_roll_rate_gain_delta"] = max(
+            float(args.rear_all_contact_stabilization_roll_rate_gain_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_side_rebalance_delta is not None:
+        params["rear_all_contact_stabilization_side_rebalance_delta"] = max(
+            float(args.rear_all_contact_stabilization_side_rebalance_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_front_anchor_z_blend is not None:
+        params["rear_all_contact_stabilization_front_anchor_z_blend"] = float(
+            max(min(args.rear_all_contact_stabilization_front_anchor_z_blend, 1.0), 0.0)
+        )
+    if args.rear_all_contact_stabilization_rear_anchor_z_blend is not None:
+        params["rear_all_contact_stabilization_rear_anchor_z_blend"] = float(
+            max(min(args.rear_all_contact_stabilization_rear_anchor_z_blend, 1.0), 0.0)
+        )
+    if args.rear_all_contact_stabilization_front_anchor_z_max_delta is not None:
+        params["rear_all_contact_stabilization_front_anchor_z_max_delta"] = max(
+            float(args.rear_all_contact_stabilization_front_anchor_z_max_delta), 0.0
+        )
+    if args.rear_all_contact_stabilization_rear_anchor_z_max_delta is not None:
+        params["rear_all_contact_stabilization_rear_anchor_z_max_delta"] = max(
+            float(args.rear_all_contact_stabilization_rear_anchor_z_max_delta), 0.0
+        )
+    if args.rear_all_contact_post_recovery_tail_hold_s is not None:
+        params["rear_all_contact_post_recovery_tail_hold_s"] = max(
+            float(args.rear_all_contact_post_recovery_tail_hold_s), 0.0
+        )
+    if args.rear_all_contact_release_tail_alpha_scale is not None:
+        params["rear_all_contact_release_tail_alpha_scale"] = max(
+            float(args.rear_all_contact_release_tail_alpha_scale), 0.0
+        )
+    if args.rear_all_contact_post_recovery_front_late_alpha_scale is not None:
+        params["rear_all_contact_post_recovery_front_late_alpha_scale"] = max(
+            float(args.rear_all_contact_post_recovery_front_late_alpha_scale), 0.0
+        )
+    if args.front_rear_transition_guard_hold_s is not None:
+        params["front_rear_transition_guard_hold_s"] = max(
+            float(args.front_rear_transition_guard_hold_s), 0.0
+        )
+    if args.front_rear_transition_guard_forward_scale is not None:
+        params["front_rear_transition_guard_forward_scale"] = float(
+            max(min(float(args.front_rear_transition_guard_forward_scale), 1.0), 0.0)
+        )
+    if args.front_rear_transition_guard_roll_threshold is not None:
+        params["front_rear_transition_guard_roll_threshold"] = max(
+            float(args.front_rear_transition_guard_roll_threshold), 0.0
+        )
+    if args.front_rear_transition_guard_pitch_threshold is not None:
+        params["front_rear_transition_guard_pitch_threshold"] = max(
+            float(args.front_rear_transition_guard_pitch_threshold), 0.0
+        )
+    if args.front_rear_transition_guard_height_ratio is not None:
+        params["front_rear_transition_guard_height_ratio"] = max(
+            float(args.front_rear_transition_guard_height_ratio), 0.0
+        )
+    if args.front_rear_transition_guard_release_tail_s is not None:
+        params["front_rear_transition_guard_release_tail_s"] = max(
+            float(args.front_rear_transition_guard_release_tail_s), 0.0
+        )
+    if args.front_rear_transition_guard_margin_release is not None:
+        params["front_rear_transition_guard_margin_release"] = max(
+            float(args.front_rear_transition_guard_margin_release), 0.0
         )
