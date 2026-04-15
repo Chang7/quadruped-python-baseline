@@ -12,8 +12,6 @@ Helper scripts are grouped by purpose.
     `run_trot_benchmark_suite.py`
 - `report_assets/`
   - scripts that generate figures, GIFs, MP4s, and docx report assets
-  - also includes fixed benchmark dashboards such as
-    `make_trot_benchmark_dashboard.py`
 - `stock_helpers/`
   - stock-stack-specific helper scripts
 
