@@ -49,6 +49,10 @@ class QuadrupedPyMPC_Wrapper:
         self.applied_linear_latched_force_scale = 0.0
         self.applied_linear_latched_front_receiver_scale = 0.0
         self.applied_linear_latched_rear_receiver_scale = 0.0
+        self.linear_solve_total_ms = 0.0
+        self.linear_solve_setup_ms = 0.0
+        self.linear_solve_wall_ms = 0.0
+        self.linear_solve_iter = 0.0
 
         self.quadrupedpympc_observables_names = quadrupedpympc_observables_names
         self.quadrupedpympc_observables = {}
@@ -519,6 +523,13 @@ class QuadrupedPyMPC_Wrapper:
                     cfg.linear_osqp_params.clear()
                     cfg.linear_osqp_params.update(support_override_backup)
 
+            if cfg.mpc_params['type'] == 'linear_osqp':
+                controller = self.srbd_controller_interface.controller
+                self.linear_solve_total_ms = float(getattr(controller, 'last_solve_total_ms', 0.0))
+                self.linear_solve_setup_ms = float(getattr(controller, 'last_solve_setup_ms', 0.0))
+                self.linear_solve_wall_ms = float(getattr(controller, 'last_solve_wall_ms', 0.0))
+                self.linear_solve_iter = float(getattr(controller, 'last_solve_iter', 0))
+
             if cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']:
                 # If the controller is gradient and is using RTI, we need to linearize the mpc after its computation
                 # this helps to minize the delay between new state->control in a real case scenario.
@@ -945,6 +956,14 @@ class QuadrupedPyMPC_Wrapper:
                 }
             elif obs_name == 'gate_forward_scale':
                 data = {'gate_forward_scale': float(self.wb_interface.last_gate_forward_scale)}
+            elif obs_name == 'linear_solve_total_ms':
+                data = {'linear_solve_total_ms': float(getattr(self, 'linear_solve_total_ms', 0.0))}
+            elif obs_name == 'linear_solve_setup_ms':
+                data = {'linear_solve_setup_ms': float(getattr(self, 'linear_solve_setup_ms', 0.0))}
+            elif obs_name == 'linear_solve_wall_ms':
+                data = {'linear_solve_wall_ms': float(getattr(self, 'linear_solve_wall_ms', 0.0))}
+            elif obs_name == 'linear_solve_iter':
+                data = {'linear_solve_iter': float(getattr(self, 'linear_solve_iter', 0.0))}
 
             else:
                 data = {}

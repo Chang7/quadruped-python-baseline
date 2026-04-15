@@ -315,6 +315,10 @@ def run_simulation(
         "front_touchdown_support_recent_remaining_s",
         "front_delayed_swing_recovery_spent",
         "gate_forward_scale",
+        "linear_solve_total_ms",
+        "linear_solve_setup_ms",
+        "linear_solve_wall_ms",
+        "linear_solve_iter",
     )
     quadrupedpympc_wrapper = QuadrupedPyMPC_Wrapper(
         initial_feet_pos=env.feet_pos,

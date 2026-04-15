@@ -152,6 +152,10 @@ def init_run_log(controller_type: str, gait: str, robot: str, scene: str) -> dic
         "front_touchdown_support_recent_remaining_s": [],
         "front_delayed_swing_recovery_spent": [],
         "gate_forward_scale": [],
+        "linear_solve_total_ms": [],
+        "linear_solve_setup_ms": [],
+        "linear_solve_wall_ms": [],
+        "linear_solve_iter": [],
         "nmpc_grfs": [],
         "nmpc_footholds": [],
         "ref_base_height": [],
@@ -371,6 +375,14 @@ def append_step(
         )
     if "gate_forward_scale" in ctrl_state:
         log["gate_forward_scale"].append(_to_numpy(ctrl_state["gate_forward_scale"]))
+    if "linear_solve_total_ms" in ctrl_state:
+        log["linear_solve_total_ms"].append(float(ctrl_state["linear_solve_total_ms"]))
+    if "linear_solve_setup_ms" in ctrl_state:
+        log["linear_solve_setup_ms"].append(float(ctrl_state["linear_solve_setup_ms"]))
+    if "linear_solve_wall_ms" in ctrl_state:
+        log["linear_solve_wall_ms"].append(float(ctrl_state["linear_solve_wall_ms"]))
+    if "linear_solve_iter" in ctrl_state:
+        log["linear_solve_iter"].append(float(ctrl_state["linear_solve_iter"]))
     if "nmpc_GRFs" in ctrl_state:
         log["nmpc_grfs"].append(_to_numpy(ctrl_state["nmpc_GRFs"]))
     if "nmpc_footholds" in ctrl_state:
@@ -510,6 +522,10 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
     full_contact_recovery_active = np.asarray(final_log.get("full_contact_recovery_active", []), dtype=float).reshape(-1)
     full_contact_recovery_alpha = np.asarray(final_log.get("full_contact_recovery_alpha", []), dtype=float).reshape(-1)
     gate_forward_scale = np.asarray(final_log.get("gate_forward_scale", []), dtype=float).reshape(-1)
+    linear_solve_total_ms = np.asarray(final_log.get("linear_solve_total_ms", []), dtype=float).reshape(-1)
+    linear_solve_setup_ms = np.asarray(final_log.get("linear_solve_setup_ms", []), dtype=float).reshape(-1)
+    linear_solve_wall_ms = np.asarray(final_log.get("linear_solve_wall_ms", []), dtype=float).reshape(-1)
+    linear_solve_iter = np.asarray(final_log.get("linear_solve_iter", []), dtype=float).reshape(-1)
     terminated = np.asarray(final_log.get("terminated", []), dtype=bool).reshape(-1)
     truncated = np.asarray(final_log.get("truncated", []), dtype=bool).reshape(-1)
 
@@ -1036,6 +1052,18 @@ def summarize_log(final_log: dict[str, Any]) -> dict[str, Any]:
     if gate_forward_scale.size:
         summary["gate_forward_scale_mean"] = _safe_float(float(np.nanmean(gate_forward_scale)))
         summary["gate_forward_scale_min"] = _safe_float(float(np.nanmin(gate_forward_scale)))
+    if linear_solve_total_ms.size:
+        summary["linear_solve_total_ms_mean"] = _safe_float(float(np.nanmean(linear_solve_total_ms)))
+        summary["linear_solve_total_ms_max"] = _safe_float(float(np.nanmax(linear_solve_total_ms)))
+    if linear_solve_setup_ms.size:
+        summary["linear_solve_setup_ms_mean"] = _safe_float(float(np.nanmean(linear_solve_setup_ms)))
+        summary["linear_solve_setup_ms_max"] = _safe_float(float(np.nanmax(linear_solve_setup_ms)))
+    if linear_solve_wall_ms.size:
+        summary["linear_solve_wall_ms_mean"] = _safe_float(float(np.nanmean(linear_solve_wall_ms)))
+        summary["linear_solve_wall_ms_max"] = _safe_float(float(np.nanmax(linear_solve_wall_ms)))
+    if linear_solve_iter.size:
+        summary["linear_solve_iter_mean"] = _safe_float(float(np.nanmean(linear_solve_iter)))
+        summary["linear_solve_iter_max"] = _safe_float(float(np.nanmax(linear_solve_iter)))
     if ref_base_height.size:
         summary["ref_base_height"] = _safe_float(np.median(ref_base_height))
 

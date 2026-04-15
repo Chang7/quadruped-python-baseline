@@ -1,12 +1,18 @@
 """This file includes all of the configuration parameters for the MPC controllers
 and of the internal simulations that can be launch from the folder /simulation.
 """
+import os
 import numpy as np
 from quadruped_pympc.helpers.quadruped_utils import GaitType
 
 # These are used both for a real experiment and a simulation -----------
 # These are the only attributes needed per quadruped, the rest can be computed automatically ----------------------
-robot = 'aliengo'  # 'aliengo', 'go1', 'go2', 'b2', 'hyqreal1', 'hyqreal2', 'mini_cheetah', 'spot'  # TODO: Load from robot_descriptions.py
+_SUPPORTED_ROBOTS = ("aliengo", "go1", "go2", "b2", "hyqreal1", "hyqreal2", "mini_cheetah", "spot")
+robot = os.getenv("QUADRUPED_PYMPC_ROBOT", "aliengo").strip().lower()
+if robot not in _SUPPORTED_ROBOTS:
+    raise ValueError(
+        f"Unsupported robot '{robot}'. Expected one of: {', '.join(_SUPPORTED_ROBOTS)}."
+    )
 
 from gym_quadruped.robot_cfgs import RobotConfig, get_robot_config
 robot_cfg: RobotConfig = get_robot_config(robot_name=robot)

@@ -13,31 +13,45 @@ failures still remain.
 
 ## Current results
 
-`trot` is the main benchmark. `crawl` is mainly a diagnostic scenario for rear
-touchdown / recontact and late load-transfer seams.
+`trot` is the main benchmark. `crawl` is still used mainly as a diagnostic
+scenario for rear touchdown / recontact and late load-transfer seams.
 
-| Scenario | Current custom | Matched stock reference | Notes |
-| --- | ---: | ---: | --- |
-| Straight 20 s `mean |pitch|` | `0.031` | `0.045` | tuned custom beats current stock reference |
-| Turn 10 s `mean |roll|` | `0.018` | `0.014` | improved, but a gap remains |
-| Turn 10 s `mean |pitch|` | `0.043` | `0.045` | close to stock |
-| Disturb 4 s `mean |roll|` | `0.020` | `0.023` | current custom is slightly better |
-| Disturb 4 s `mean |pitch|` | `0.034` | `0.055` | current custom is better |
-| Crawl 20 s duration | `13.54 s` | n/a | current custom still fails at the late low-height seam |
+The current `linear_osqp` path uses one unified `generic` trot profile for the
+three representative trot checks below.
+
+| Scenario | Custom (`linear_osqp`) | Matched stock (`sampling`) |
+| --- | ---: | ---: |
+| Straight 20 s `mean |roll|` | `0.009` | `0.018` |
+| Straight 20 s `mean |pitch|` | `0.022` | `0.056` |
+| Turn 10 s `mean |roll|` | `0.011` | `0.014` |
+| Turn 10 s `mean |pitch|` | `0.024` | `0.045` |
+| Disturb 4 s `mean |roll|` | `0.006` | `0.031` |
+| Disturb 4 s `mean |pitch|` | `0.030` | `0.059` |
+
+The current local matched benchmark is:
+
+- Straight: `20 s`, `0.12 m/s`, no yaw command, no disturbance
+- Turn: `10 s`, `0.10 m/s`, `yaw-rate = 0.3 rad/s`
+- Disturbance: `4 s`, `0.12 m/s`, pulses `x:0.5:0.25:4.0` and `x:2.3:0.25:8.0`
+
+On Go1, the same unified trot controller already runs the same three checks
+without termination, but the turn posture is still rougher than on Aliengo and
+should be retuned before treating Go1 as a stable benchmark target.
 
 ## Current state
 
-- Stock `trot` straight / turn / disturbance checks are stable.
-- Current `linear_osqp` `trot` runs complete:
-  - straight `20 s`
-  - turn `10 s`
-  - disturbance `4 s`
-  without termination.
-- Current `crawl` default reaches about `13.54 s` before a late `RL_hip`
-  invalid contact.
-- The main remaining bottlenecks are:
-  - `trot`: remaining turn-roll / tracking quality gap relative to stock
-  - `crawl`: late rear load transfer / post-touchdown stabilization
+- The unified `generic` trot profile covers straight / turn / disturbance
+  without the older `straight_tuned` split.
+- The current custom trot path completes the three representative trot checks
+  without termination and matches or beats the stock sampling reference in
+  roll / pitch on the local Aliengo benchmark.
+- Go1 now runs through the same three trot checks with the same controller
+  structure, which is a good bring-up result, but Go1-specific retuning is
+  still expected.
+- The main remaining open problems are:
+  - Go1 trot retuning, especially for turn posture
+  - solve-time characterization for hardware deployment
+  - crawl late rear load transfer / post-touchdown stabilization
 
 ## Repository layout
 
@@ -64,6 +78,13 @@ pip install -e .
 Run the custom controller:
 
 ```bash
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
+```
+
+Run the same controller on Go1:
+
+```powershell
+$env:QUADRUPED_PYMPC_ROBOT='go1'
 python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
 ```
 
@@ -98,6 +119,19 @@ Benchmark suite launcher:
 ```bash
 python tools/launchers/run_trot_benchmark_suite.py --skip-existing
 ```
+
+## Timing metrics
+
+Each `summary.json` now also records `linear_osqp` timing fields when that
+controller is used:
+
+- `linear_solve_total_ms_mean`, `linear_solve_total_ms_max`
+- `linear_solve_setup_ms_mean`, `linear_solve_setup_ms_max`
+- `linear_solve_wall_ms_mean`, `linear_solve_wall_ms_max`
+- `linear_solve_iter_mean`, `linear_solve_iter_max`
+
+A recent Go1 probe on the unified trot controller showed mean total solve times
+around `3.7-4.0 ms`, with wall-solve means around `1.2 ms`.
 
 ## Where to look first
 

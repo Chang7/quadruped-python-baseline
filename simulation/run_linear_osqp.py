@@ -61,14 +61,9 @@ def _parse_disturbance_pulses(specs: list[str] | None) -> list[dict[str, object]
 
 
 def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
-    """Dynamic-gait profile that remains usable across straight, turn, and disturbance checks."""
+    """Single trot profile used for the current straight/turn/disturbance checks."""
     return {
         "command_smoothing": 0.0,
-        # Axis-specific orientation / angular-rate Q weighting was the cleanest
-        # way to improve generic trot posture without falling back to heavier
-        # post-hoc heuristics. Pitch weighting gave the first large gain, and
-        # additional roll weighting reduced the remaining turn/disturbance roll
-        # drift while preserving forward tracking over longer horizons too.
         "Q_theta_roll": 160000.0,
         "Q_theta_pitch": 240000.0,
         "Q_w_roll": 16000.0,
@@ -76,15 +71,8 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "vy_gain": 6.0,
         "vx_gain": 2.3,
         "fy_scale": 1.0,
-        # With fy_scale=1.0, dynamic_fy_roll_gain has no effect because
-        # it only adjusts fy_scale upward (min(1.0, fy_scale + gain*ratio) = 1.0).
-        # Verified: gain=0.0 and gain=0.25 produce identical results across
-        # all three trot scenarios when fy_scale=1.0.
         "dynamic_fy_roll_gain": 0.0,
         "dynamic_fy_roll_ref": 0.18,
-        # Turn-specific foothold yaw compensation helps the linear controller
-        # generate a clearer turning geometry without affecting straight-line
-        # gait logic.
         "foothold_yaw_rate_scale": 0.0,
         "foothold_yaw_error_scale": 0.0,
         "grf_max_scale": 1.0,
@@ -94,13 +82,7 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "latched_joint_pd_scale": 0.10,
         "rear_floor_base_scale": 0.65,
         "rear_floor_pitch_gain": 0.20,
-        # A stronger support-wrench blend improves short-horizon turn and
-        # disturbance posture quality without changing the straight-tuned
-        # profile used for longer straight-line trot checks.
         "support_reference_mix": 0.85,
-        # Keep the more posture-friendly vertical blend while allowing the
-        # horizontal support reference to follow the solved wrench more
-        # aggressively for better forward tracking.
         "support_reference_xy_mix": 1.0,
         "min_vertical_force_scale": 1.0,
         "reduced_support_vertical_boost": 0.40,
@@ -112,17 +94,7 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
         "pitch_angle_gain": 40.0,
         "pitch_rate_gain": 12.0,
         "pitch_rebalance_ref": 0.20,
-        # The remaining dynamic-gait error is a steady posture bias (mean signed
-        # pitch = mean |pitch|, not oscillating). roll_ref_offset=+0.03 was the
-        # original fix. pitch_ref_offset was then swept from -0.01 to -0.03:
-        # the stronger offset cuts mean |pitch| by 27-40% across all scenarios,
-        # now beating stock pitch in every trot check.
         "roll_ref_offset": 0.03,
-        # The remaining dynamic-gait error is a steady posture bias (mean signed
-        # pitch = mean |pitch|, not oscillating). roll_ref_offset=+0.03 was the
-        # original fix. pitch_ref_offset was then swept from -0.01 to -0.03:
-        # the stronger offset cuts mean |pitch| by 27-40% across all scenarios,
-        # now beating stock pitch in every trot check.
         "pitch_ref_offset": -0.03,
         "pre_swing_gate_min_margin": 0.0,
         "front_pre_swing_gate_min_margin": 0.0,
@@ -134,11 +106,7 @@ def _dynamic_gait_conservative_profile() -> dict[str, float | int]:
     }
 
 
-def _dynamic_gait_profile_for(gait: str, trot_profile: str) -> dict[str, float | int]:
-    # With fy_scale=1.0, a single generic profile covers straight/turn/disturbance.
-    # The previous straight_tuned profile was needed when fy_scale=0.35 required
-    # separate tuning for straight-line tracking, but sweep tests confirmed that
-    # the generic profile now handles all trot scenarios without regression.
+def _dynamic_gait_profile_for(gait: str) -> dict[str, float | int]:
     if gait not in {"trot", "pace", "bound"}:
         return {}
     return _dynamic_gait_conservative_profile()
@@ -147,9 +115,6 @@ def _dynamic_gait_profile_for(gait: str, trot_profile: str) -> dict[str, float |
 def _resolve_dynamic_trot_profile(
     gait: str,
     requested_profile: str,
-    yaw_rate: float,
-    lateral_speed: float,
-    disturbance_schedule: list[dict[str, object]],
 ) -> str:
     """Resolve the effective trot dynamic profile.
 
@@ -520,9 +485,6 @@ def main() -> None:
     selected_dynamic_trot_profile = _resolve_dynamic_trot_profile(
         gait=args.gait,
         requested_profile=args.dynamic_trot_profile,
-        yaw_rate=args.yaw_rate,
-        lateral_speed=args.lateral_speed,
-        disturbance_schedule=disturbance_schedule,
     )
 
     cfg.mpc_params["type"] = args.controller
@@ -956,7 +918,7 @@ def main() -> None:
                     }
                 )
             if args.gait in {"trot", "pace", "bound"}:
-                conservative_params.update(_dynamic_gait_profile_for(args.gait, selected_dynamic_trot_profile))
+                conservative_params.update(_dynamic_gait_profile_for(args.gait))
             cfg.linear_osqp_params.update(conservative_params)
         if args.linear_osqp_params_json:
             params_path = Path(args.linear_osqp_params_json).expanduser().resolve()

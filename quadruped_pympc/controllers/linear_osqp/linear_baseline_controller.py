@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import time
 from typing import Tuple
 
 import numpy as np
@@ -200,12 +201,20 @@ class LinearSRBDController:
         self.last_status = "cold_start"
         self.prev_contact = np.zeros(4, dtype=bool)
         self.stance_age = np.zeros(4, dtype=int)
+        self.last_solve_total_ms = 0.0
+        self.last_solve_setup_ms = 0.0
+        self.last_solve_wall_ms = 0.0
+        self.last_solve_iter = 0
 
     def reset(self) -> None:
         self.last_u = np.zeros(NU, dtype=float)
         self.last_status = "reset"
         self.prev_contact = np.zeros(4, dtype=bool)
         self.stance_age = np.zeros(4, dtype=int)
+        self.last_solve_total_ms = 0.0
+        self.last_solve_setup_ms = 0.0
+        self.last_solve_wall_ms = 0.0
+        self.last_solve_iter = 0
 
     def _make_cfg(self, inertia: np.ndarray) -> LinearOSQPConfig:
         params = _get_linear_params()
@@ -529,7 +538,8 @@ class LinearSRBDController:
         l: np.ndarray,
         u: np.ndarray,
         warm_start: np.ndarray,
-    ) -> tuple[np.ndarray, str]:
+    ) -> tuple[np.ndarray, str, dict[str, float | int]]:
+        t0 = time.perf_counter()
         prob = osqp.OSQP()
         prob.setup(
             P=p,
@@ -541,13 +551,22 @@ class LinearSRBDController:
             verbose=False,
             polish=False,
         )
+        t_setup_done = time.perf_counter()
         if warm_start.size == q_vec.size:
             prob.warm_start(x=warm_start)
+        t_solve_start = time.perf_counter()
         res = prob.solve()
+        t_solve_done = time.perf_counter()
         status = str(getattr(res.info, "status", "unknown"))
+        stats = {
+            "solve_total_ms": float((t_solve_done - t0) * 1e3),
+            "solve_setup_ms": float((t_setup_done - t0) * 1e3),
+            "solve_wall_ms": float((t_solve_done - t_solve_start) * 1e3),
+            "solve_iter": int(getattr(res.info, "iter", 0)),
+        }
         if not status.startswith("solved"):
             raise RuntimeError(status)
-        return np.asarray(res.x, dtype=float), status
+        return np.asarray(res.x, dtype=float), status, stats
 
     @staticmethod
     def _apply_slew_and_smoothing(u_des: np.ndarray, u_prev: np.ndarray, cfg: LinearOSQPConfig) -> np.ndarray:
@@ -1118,7 +1137,7 @@ class LinearSRBDController:
             warm[(cfg.horizon + 1) * NX : (cfg.horizon + 1) * NX + NU] = u_prev
 
         try:
-            z, status = self._solve_osqp(p, q_vec, a, l, u, warm)
+            z, status, solve_stats = self._solve_osqp(p, q_vec, a, l, u, warm)
             u0_raw = z[(cfg.horizon + 1) * NX : (cfg.horizon + 1) * NX + NU].reshape(NU)
             u0 = self._apply_slew_and_smoothing(u0_raw, u_prev, cfg)
             u0 = self._apply_contact_conditioning(
@@ -1132,6 +1151,10 @@ class LinearSRBDController:
             )
             self.last_u = u0.copy()
             self.last_status = status
+            self.last_solve_total_ms = float(solve_stats["solve_total_ms"])
+            self.last_solve_setup_ms = float(solve_stats["solve_setup_ms"])
+            self.last_solve_wall_ms = float(solve_stats["solve_wall_ms"])
+            self.last_solve_iter = int(solve_stats["solve_iter"])
         except Exception as exc:  # pragma: no cover - fallback path for runtime robustness
             u0 = self._apply_contact_conditioning(
                 u_prev.copy(),
@@ -1144,6 +1167,10 @@ class LinearSRBDController:
             )
             self.last_u = u0.copy()
             self.last_status = f"fallback:{type(exc).__name__}:{exc}"
+            self.last_solve_total_ms = 0.0
+            self.last_solve_setup_ms = 0.0
+            self.last_solve_wall_ms = 0.0
+            self.last_solve_iter = 0
 
         x_pred = ad_list[0] @ x_init + bd_list[0] @ u0
         return u0, footholds, x_pred[:12], self.last_status
