@@ -872,7 +872,7 @@ class QuadrupedPyMPC_Wrapper:
             elif obs_name == 'crawl_front_planted_seam_support_alpha':
                 data = {
                     'crawl_front_planted_seam_support_alpha': float(
-                        getattr(self.wb_interface, 'crawl_front_planted_seam_support_alpha', 0.0)
+                        self.wb_interface.crawl_state.front_planted_seam_support_alpha
                     )
                 }
             elif obs_name == 'rear_handoff_support_active':
@@ -938,7 +938,7 @@ class QuadrupedPyMPC_Wrapper:
             elif obs_name == 'crawl_front_stance_support_tail_remaining_s':
                 data = {
                     'crawl_front_stance_support_tail_remaining_s': float(
-                        self.wb_interface.crawl_front_stance_support_tail_remaining_s
+                        self.wb_interface.crawl_state.front_stance_support_tail_remaining_s
                     )
                 }
             elif obs_name == 'front_touchdown_support_recent_remaining_s':

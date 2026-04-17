@@ -32,7 +32,7 @@ Go1 results (after robot-specific posture offset retuning):
 | Disturb 4 s `mean\|roll\|` | 0.008 | |
 | Disturb 4 s `mean\|pitch\|` | 0.052 | |
 
-Solve time (Go1, unified trot): wall-solve mean ~1.2 ms per step.
+Solve time (Go1, unified trot): QP solve mean 1.2–1.4 ms, setup + solve mean 3.7–4.5 ms per step.
 
 ## Quick start
 
@@ -97,8 +97,8 @@ tools/                    benchmark launcher
 
 Each `summary.json` records per-step timing when `linear_osqp` is used:
 
-- `linear_solve_wall_ms_mean` / `max` — OSQP wall-clock solve time
-- `linear_solve_total_ms_mean` / `max` — total controller step time
+- `linear_solve_wall_ms_mean` / `max` — OSQP QP solve time
+- `linear_solve_total_ms_mean` / `max` — setup + solve time
 
 ## Notes
 

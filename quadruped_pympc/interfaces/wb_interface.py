@@ -1,11 +1,109 @@
 import copy
 import time
+from dataclasses import dataclass
 
 import numpy as np
 from gym_quadruped.utils.quadruped_utils import LegsAttr
 from scipy.spatial.transform import Rotation as R
 
 from quadruped_pympc import config as cfg
+
+
+# ---------------------------------------------------------------------------
+# Crawl-specific config and state dataclasses
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CrawlParams:
+    """Crawl-gait-specific configuration parameters."""
+
+    # Swing height / reflex
+    rear_disable_reflex_swing: bool = False
+    front_swing_height_scale: float = 1.0
+    rear_swing_height_scale: float = 1.0
+    # Stuck swing release
+    front_stuck_swing_release_timeout_s: float = 0.0
+    front_stuck_swing_release_height_ratio: float = 0.0
+    front_stuck_swing_release_roll_threshold: float = float('inf')
+    front_stuck_swing_release_pitch_threshold: float = float('inf')
+    # Delayed swing recovery
+    front_delayed_swing_recovery_hold_s: float = 0.0
+    front_delayed_swing_recovery_margin_threshold: float = 0.0
+    front_delayed_swing_recovery_once_per_swing: bool = False
+    front_delayed_swing_recovery_release_tail_s: float = 0.0
+    front_delayed_swing_recovery_rearm_trigger_s: float = 0.0
+    # Planted swing recovery
+    front_planted_swing_recovery_hold_s: float = 0.0
+    front_planted_swing_recovery_margin_threshold: float = 0.0
+    front_planted_swing_recovery_height_ratio: float = 0.0
+    front_planted_swing_recovery_roll_threshold: object = None
+    front_planted_swing_recovery_rearm_trigger_s: float = 0.0
+    front_planted_postdrop_recovery_hold_s: float = 0.0
+    # Planted seam support
+    front_planted_seam_support_hold_s: float = 0.0
+    front_planted_seam_keep_swing: bool = False
+    # Stance support tail
+    front_stance_support_tail_hold_s: float = 0.0
+    front_stance_support_tail_forward_scale: float = 1.0
+    # Close gap
+    front_close_gap_support_hold_s: float = 0.0
+    front_close_gap_keep_swing: bool = False
+    # Late rearm
+    front_late_rearm_tail_hold_s: float = 0.0
+    front_late_rearm_budget_s: float = 0.0
+    front_late_rearm_min_swing_time_s: float = 0.0
+    front_late_rearm_min_negative_margin: float = 0.0
+    # Weak rear
+    front_planted_weak_rear_share_ref: float = 0.0
+    front_planted_weak_rear_alpha_cap: float = 1.0
+
+
+@dataclass
+class CrawlState:
+    """Crawl-gait-specific mutable runtime state (reset each episode)."""
+
+    front_stance_support_tail_remaining_s: float = 0.0
+    front_planted_seam_support_remaining_s: float = 0.0
+    front_planted_seam_support_alpha: float = 0.0
+
+
+# Spec for table-driven param parsing: (field_name, param_key, parse_kind)
+# parse_kind: 'nonneg' = max(float,0), 'float' = float, 'bool' = bool,
+#             'clip01' = clip(0,1), 'clip02' = clip(0,2),
+#             'opt_inf' = inf-if-None else max(float,0),
+#             'opt_none' = None-if-None else max(float,0)
+_CRAWL_PARAM_SPEC = (
+    ('rear_disable_reflex_swing', 'rear_crawl_disable_reflex_swing', 'bool'),
+    ('front_swing_height_scale', 'front_crawl_swing_height_scale', 'clip02'),
+    ('rear_swing_height_scale', 'rear_crawl_swing_height_scale', 'clip02'),
+    ('front_stuck_swing_release_timeout_s', 'crawl_front_stuck_swing_release_timeout_s', 'nonneg'),
+    ('front_stuck_swing_release_height_ratio', 'crawl_front_stuck_swing_release_height_ratio', 'nonneg'),
+    ('front_stuck_swing_release_roll_threshold', 'crawl_front_stuck_swing_release_roll_threshold', 'opt_inf'),
+    ('front_stuck_swing_release_pitch_threshold', 'crawl_front_stuck_swing_release_pitch_threshold', 'opt_inf'),
+    ('front_delayed_swing_recovery_hold_s', 'crawl_front_delayed_swing_recovery_hold_s', 'nonneg'),
+    ('front_delayed_swing_recovery_margin_threshold', 'crawl_front_delayed_swing_recovery_margin_threshold', 'float'),
+    ('front_delayed_swing_recovery_once_per_swing', 'crawl_front_delayed_swing_recovery_once_per_swing', 'bool'),
+    ('front_delayed_swing_recovery_release_tail_s', 'crawl_front_delayed_swing_recovery_release_tail_s', 'nonneg'),
+    ('front_delayed_swing_recovery_rearm_trigger_s', 'crawl_front_delayed_swing_recovery_rearm_trigger_s', 'nonneg'),
+    ('front_planted_swing_recovery_hold_s', 'crawl_front_planted_swing_recovery_hold_s', 'nonneg'),
+    ('front_planted_swing_recovery_margin_threshold', 'crawl_front_planted_swing_recovery_margin_threshold', 'float'),
+    ('front_planted_swing_recovery_height_ratio', 'crawl_front_planted_swing_recovery_height_ratio', 'nonneg'),
+    ('front_planted_swing_recovery_roll_threshold', 'crawl_front_planted_swing_recovery_roll_threshold', 'opt_none'),
+    ('front_planted_swing_recovery_rearm_trigger_s', 'crawl_front_planted_swing_recovery_rearm_trigger_s', 'nonneg'),
+    ('front_planted_postdrop_recovery_hold_s', 'crawl_front_planted_postdrop_recovery_hold_s', 'nonneg'),
+    ('front_planted_seam_support_hold_s', 'crawl_front_planted_seam_support_hold_s', 'nonneg'),
+    ('front_planted_seam_keep_swing', 'crawl_front_planted_seam_keep_swing', 'bool'),
+    ('front_stance_support_tail_hold_s', 'crawl_front_stance_support_tail_hold_s', 'nonneg'),
+    ('front_stance_support_tail_forward_scale', 'crawl_front_stance_support_tail_forward_scale', 'clip01'),
+    ('front_close_gap_support_hold_s', 'crawl_front_close_gap_support_hold_s', 'nonneg'),
+    ('front_close_gap_keep_swing', 'crawl_front_close_gap_keep_swing', 'bool'),
+    ('front_late_rearm_tail_hold_s', 'crawl_front_late_rearm_tail_hold_s', 'nonneg'),
+    ('front_late_rearm_budget_s', 'crawl_front_late_rearm_budget_s', 'nonneg'),
+    ('front_late_rearm_min_swing_time_s', 'crawl_front_late_rearm_min_swing_time_s', 'nonneg'),
+    ('front_late_rearm_min_negative_margin', 'crawl_front_late_rearm_min_negative_margin', 'nonneg'),
+    ('front_planted_weak_rear_share_ref', 'crawl_front_planted_weak_rear_share_ref', 'nonneg'),
+    ('front_planted_weak_rear_alpha_cap', 'crawl_front_planted_weak_rear_alpha_cap', 'clip01'),
+)
 from quadruped_pympc.helpers.foothold_reference_generator import FootholdReferenceGenerator
 #from quadruped_pympc.helpers.inverse_kinematics.inverse_kinematics_numeric_adam import InverseKinematicsNumeric
 from quadruped_pympc.helpers.inverse_kinematics.inverse_kinematics_numeric_mujoco import InverseKinematicsNumeric
@@ -183,9 +281,8 @@ class WBInterface:
         self.rear_touchdown_contact_max_upward_vel = np.inf
         self.rear_touchdown_contact_min_grf_z = 0.0
         self.rear_touchdown_close_lock_hold_s = 0.0
-        self.rear_crawl_disable_reflex_swing = False
-        self.front_crawl_swing_height_scale = 1.0
-        self.rear_crawl_swing_height_scale = 1.0
+        self.crawl_params = CrawlParams()
+        self.crawl_state = CrawlState()
         self.stance_anchor_update_alpha = 0.0
         self.front_stance_anchor_update_alpha = 0.0
         self.rear_stance_anchor_update_alpha = 0.0
@@ -236,27 +333,6 @@ class WBInterface:
         self.full_contact_recovery_height_ratio = 0.0
         self.full_contact_recovery_recent_window_s = 0.0
         self.full_contact_recovery_rear_support_scale = 0.0
-        self.crawl_front_delayed_swing_recovery_hold_s = 0.0
-        self.crawl_front_delayed_swing_recovery_margin_threshold = 0.0
-        self.crawl_front_delayed_swing_recovery_once_per_swing = False
-        self.crawl_front_delayed_swing_recovery_release_tail_s = 0.0
-        self.crawl_front_delayed_swing_recovery_rearm_trigger_s = 0.0
-        self.crawl_front_planted_swing_recovery_hold_s = 0.0
-        self.crawl_front_planted_swing_recovery_margin_threshold = 0.0
-        self.crawl_front_planted_swing_recovery_height_ratio = 0.0
-        self.crawl_front_planted_swing_recovery_roll_threshold = None
-        self.crawl_front_planted_swing_recovery_rearm_trigger_s = 0.0
-        self.crawl_front_planted_postdrop_recovery_hold_s = 0.0
-        self.crawl_front_planted_seam_support_hold_s = 0.0
-        self.crawl_front_planted_seam_keep_swing = False
-        self.crawl_front_stance_support_tail_hold_s = 0.0
-        self.crawl_front_stance_support_tail_forward_scale = 1.0
-        self.crawl_front_close_gap_support_hold_s = 0.0
-        self.crawl_front_close_gap_keep_swing = False
-        self.crawl_front_late_rearm_tail_hold_s = 0.0
-        self.crawl_front_late_rearm_budget_s = 0.0
-        self.crawl_front_late_rearm_min_swing_time_s = 0.0
-        self.crawl_front_late_rearm_min_negative_margin = 0.0
         self.pre_swing_gate_hold_s = 0.0
         self.startup_full_stance_elapsed_s = 0.0
         self.contact_latch_elapsed_s = np.zeros(4, dtype=float)
@@ -291,8 +367,6 @@ class WBInterface:
         self.rear_swing_release_support_remaining_s = 0.0
         self.rear_swing_release_support_active = 0
         self.full_contact_recovery_remaining_s = 0.0
-        self.crawl_front_stance_support_tail_remaining_s = 0.0
-        self.crawl_front_planted_seam_support_remaining_s = 0.0
         self.front_rear_transition_guard_post_recovery_remaining_s = 0.0
         self.rear_all_contact_post_recovery_remaining_s = 0.0
         self.rear_all_contact_post_recovery_alpha_scale = 1.0
@@ -340,7 +414,6 @@ class WBInterface:
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
         self.rear_all_contact_front_planted_tail_alpha = 0.0
-        self.crawl_front_planted_seam_support_alpha = 0.0
         self.rear_all_contact_weak_leg_alpha = 0.0
         self.rear_all_contact_weak_leg_index = -1
         self.rear_close_handoff_alpha = 0.0
@@ -456,22 +529,7 @@ class WBInterface:
             float(self.swing_contact_release_timeout_s if rear_release_timeout is None else rear_release_timeout),
             0.0,
         )
-        self.crawl_front_stuck_swing_release_timeout_s = max(
-            float(params.get('crawl_front_stuck_swing_release_timeout_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_stuck_swing_release_height_ratio = max(
-            float(params.get('crawl_front_stuck_swing_release_height_ratio', 0.0)),
-            0.0,
-        )
-        crawl_front_stuck_roll = params.get('crawl_front_stuck_swing_release_roll_threshold', None)
-        self.crawl_front_stuck_swing_release_roll_threshold = (
-            np.inf if crawl_front_stuck_roll is None else float(max(crawl_front_stuck_roll, 0.0))
-        )
-        crawl_front_stuck_pitch = params.get('crawl_front_stuck_swing_release_pitch_threshold', None)
-        self.crawl_front_stuck_swing_release_pitch_threshold = (
-            np.inf if crawl_front_stuck_pitch is None else float(max(crawl_front_stuck_pitch, 0.0))
-        )
+        self._parse_crawl_params(params)
         self.front_release_lift_height = max(float(params.get('front_release_lift_height', 0.0)), 0.0)
         self.front_release_lift_kp = max(float(params.get('front_release_lift_kp', 0.0)), 0.0)
         self.front_release_lift_kd = max(float(params.get('front_release_lift_kd', 0.0)), 0.0)
@@ -651,13 +709,6 @@ class WBInterface:
         self.rear_touchdown_reacquire_retire_stance_hold_s = max(
             float(params.get('rear_touchdown_reacquire_retire_stance_hold_s', 0.0)),
             0.0,
-        )
-        self.rear_crawl_disable_reflex_swing = bool(params.get('rear_crawl_disable_reflex_swing', False))
-        self.front_crawl_swing_height_scale = float(
-            np.clip(params.get('front_crawl_swing_height_scale', 1.0), 0.0, 2.0)
-        )
-        self.rear_crawl_swing_height_scale = float(
-            np.clip(params.get('rear_crawl_swing_height_scale', 1.0), 0.0, 2.0)
         )
         self.stance_anchor_update_alpha = float(
             np.clip(params.get('stance_anchor_update_alpha', 0.0), 0.0, 1.0)
@@ -909,84 +960,6 @@ class WBInterface:
             float(params.get('full_contact_recovery_allcontact_release_tail_s', 0.0)),
             0.0,
         )
-        self.crawl_front_delayed_swing_recovery_hold_s = max(
-            float(params.get('crawl_front_delayed_swing_recovery_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_delayed_swing_recovery_margin_threshold = float(
-            params.get('crawl_front_delayed_swing_recovery_margin_threshold', 0.0)
-        )
-        self.crawl_front_delayed_swing_recovery_once_per_swing = bool(
-            params.get('crawl_front_delayed_swing_recovery_once_per_swing', False)
-        )
-        self.crawl_front_delayed_swing_recovery_release_tail_s = max(
-            float(params.get('crawl_front_delayed_swing_recovery_release_tail_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_delayed_swing_recovery_rearm_trigger_s = max(
-            float(params.get('crawl_front_delayed_swing_recovery_rearm_trigger_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_swing_recovery_hold_s = max(
-            float(params.get('crawl_front_planted_swing_recovery_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_swing_recovery_margin_threshold = float(
-            params.get('crawl_front_planted_swing_recovery_margin_threshold', 0.0)
-        )
-        self.crawl_front_planted_swing_recovery_height_ratio = max(
-            float(params.get('crawl_front_planted_swing_recovery_height_ratio', 0.0)),
-            0.0,
-        )
-        crawl_front_planted_roll = params.get('crawl_front_planted_swing_recovery_roll_threshold', None)
-        self.crawl_front_planted_swing_recovery_roll_threshold = (
-            None if crawl_front_planted_roll is None else max(float(crawl_front_planted_roll), 0.0)
-        )
-        self.crawl_front_planted_swing_recovery_rearm_trigger_s = max(
-            float(params.get('crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_postdrop_recovery_hold_s = max(
-            float(params.get('crawl_front_planted_postdrop_recovery_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_seam_support_hold_s = max(
-            float(params.get('crawl_front_planted_seam_support_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_seam_keep_swing = bool(
-            params.get('crawl_front_planted_seam_keep_swing', False)
-        )
-        self.crawl_front_stance_support_tail_hold_s = max(
-            float(params.get('crawl_front_stance_support_tail_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_stance_support_tail_forward_scale = float(
-            np.clip(params.get('crawl_front_stance_support_tail_forward_scale', 1.0), 0.0, 1.0)
-        )
-        self.crawl_front_close_gap_support_hold_s = max(
-            float(params.get('crawl_front_close_gap_support_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_close_gap_keep_swing = bool(
-            params.get('crawl_front_close_gap_keep_swing', False)
-        )
-        self.crawl_front_late_rearm_tail_hold_s = max(
-            float(params.get('crawl_front_late_rearm_tail_hold_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_late_rearm_budget_s = max(
-            float(params.get('crawl_front_late_rearm_budget_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_late_rearm_min_swing_time_s = max(
-            float(params.get('crawl_front_late_rearm_min_swing_time_s', 0.0)),
-            0.0,
-        )
-        self.crawl_front_late_rearm_min_negative_margin = max(
-            float(params.get('crawl_front_late_rearm_min_negative_margin', 0.0)),
-            0.0,
-        )
         self.rear_all_contact_stabilization_hold_s = max(
             float(params.get('rear_all_contact_stabilization_hold_s', 0.0)),
             0.0,
@@ -1089,17 +1062,6 @@ class WBInterface:
         self.rear_all_contact_post_recovery_front_late_alpha_scale = float(
             np.clip(
                 params.get('rear_all_contact_post_recovery_front_late_alpha_scale', 1.0),
-                0.0,
-                1.0,
-            )
-        )
-        self.crawl_front_planted_weak_rear_share_ref = max(
-            float(params.get('crawl_front_planted_weak_rear_share_ref', 0.0)),
-            0.0,
-        )
-        self.crawl_front_planted_weak_rear_alpha_cap = float(
-            np.clip(
-                params.get('crawl_front_planted_weak_rear_alpha_cap', 1.0),
                 0.0,
                 1.0,
             )
@@ -1787,7 +1749,7 @@ class WBInterface:
             cfg.mpc_params['type'] == 'linear_osqp'
             and self.gait_name == 'crawl'
             and leg_id >= 2
-            and bool(self.rear_crawl_disable_reflex_swing)
+            and bool(self.crawl_params.rear_disable_reflex_swing)
         ):
             early_stance_hitmoment = -1.0
             early_stance_hitpoint = None
@@ -1801,9 +1763,9 @@ class WBInterface:
         swing_height_scale = 1.0
         if cfg.mpc_params['type'] == 'linear_osqp' and self.gait_name == 'crawl':
             if leg_id < 2:
-                swing_height_scale = float(self.front_crawl_swing_height_scale)
+                swing_height_scale = float(self.crawl_params.front_swing_height_scale)
             else:
-                swing_height_scale = float(self.rear_crawl_swing_height_scale)
+                swing_height_scale = float(self.crawl_params.rear_swing_height_scale)
         if abs(float(swing_height_scale) - 1.0) > 1e-3:
             lift_off = np.asarray(self.frg.lift_off_positions[leg_name], dtype=float).reshape(3)
             touch_down_arr = np.asarray(touch_down, dtype=float).reshape(3)
@@ -1846,6 +1808,27 @@ class WBInterface:
             tau_swing += mass_matrix @ np.linalg.pinv(J) @ (acceleration - J_dot @ q_dot) + h
 
         return np.asarray(tau_swing, dtype=float).reshape(3), des_foot_pos, des_foot_vel
+
+    def _parse_crawl_params(self, params: dict) -> None:
+        """Populate self.crawl_params from a flat params dict, table-driven."""
+        cp = self.crawl_params
+        for field_name, param_key, kind in _CRAWL_PARAM_SPEC:
+            raw = params.get(param_key, None)
+            if raw is None:
+                # Missing or explicit-None: keep dataclass default.
+                continue
+            if kind == 'nonneg':
+                setattr(cp, field_name, max(float(raw), 0.0))
+            elif kind == 'float':
+                setattr(cp, field_name, float(raw))
+            elif kind == 'bool':
+                setattr(cp, field_name, bool(raw))
+            elif kind == 'clip01':
+                setattr(cp, field_name, float(np.clip(raw, 0.0, 1.0)))
+            elif kind == 'clip02':
+                setattr(cp, field_name, float(np.clip(raw, 0.0, 2.0)))
+            elif kind in ('opt_inf', 'opt_none'):
+                setattr(cp, field_name, max(float(raw), 0.0))
 
     def _process_crawl_recovery(
         self,
@@ -1939,15 +1922,15 @@ class WBInterface:
                 recovery_hold_s,
             )
         delayed_front_swing_recovery_hold_s = float(
-            getattr(self, 'crawl_front_delayed_swing_recovery_hold_s', 0.0)
+            getattr(self.crawl_params, 'front_delayed_swing_recovery_hold_s', 0.0)
         )
         front_planned_swing = np.asarray(contact_sequence[0:2, 0], dtype=int) == 0
         delayed_front_margin_threshold = float(
-            getattr(self, 'crawl_front_delayed_swing_recovery_margin_threshold', 0.0)
+            getattr(self.crawl_params, 'front_delayed_swing_recovery_margin_threshold', 0.0)
         )
         if delayed_front_swing_recovery_hold_s > 1e-9:
             delayed_front_recovery_once_per_swing = bool(
-                getattr(self, 'crawl_front_delayed_swing_recovery_once_per_swing', False)
+                getattr(self.crawl_params, 'front_delayed_swing_recovery_once_per_swing', False)
             )
             if delayed_front_recovery_once_per_swing:
                 self.front_delayed_swing_recovery_spent[np.logical_not(front_planned_swing)] = 0
@@ -1969,10 +1952,10 @@ class WBInterface:
                 dtype=float,
             )
             delayed_front_release_tail_s = float(
-                getattr(self, 'crawl_front_delayed_swing_recovery_release_tail_s', 0.0)
+                getattr(self.crawl_params, 'front_delayed_swing_recovery_release_tail_s', 0.0)
             )
             delayed_front_rearm_trigger_s = float(
-                getattr(self, 'crawl_front_delayed_swing_recovery_rearm_trigger_s', 0.0)
+                getattr(self.crawl_params, 'front_delayed_swing_recovery_rearm_trigger_s', 0.0)
             )
             eligible_front_delayed_swing = (
                 front_planned_swing
@@ -2019,7 +2002,7 @@ class WBInterface:
                         delayed_front_release_tail_s,
                     )
         planted_front_recovery_hold_s = float(
-            getattr(self, 'crawl_front_planted_swing_recovery_hold_s', 0.0)
+            getattr(self.crawl_params, 'front_planted_swing_recovery_hold_s', 0.0)
         )
         if planted_front_recovery_hold_s > 1e-9:
             self.front_planted_swing_recovery_spent[np.logical_not(front_planned_swing)] = 0
@@ -2037,7 +2020,7 @@ class WBInterface:
                 and np.all(actual_contact_array[2:4] == 1)
             )
             planted_front_height_ratio = float(
-                getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)
+                getattr(self.crawl_params, 'front_planted_swing_recovery_height_ratio', 0.0)
             )
             planted_front_roll_threshold = getattr(
                 self,
@@ -2056,7 +2039,7 @@ class WBInterface:
                 )
             )
             planted_front_recovery_rearm_trigger_s = float(
-                getattr(self, 'crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)
+                getattr(self.crawl_params, 'front_planted_swing_recovery_rearm_trigger_s', 0.0)
             )
             planted_front_recovery_near_expiry = bool(
                 (prev_full_contact_recovery_active or float(self.full_contact_recovery_remaining_s) > 1e-9)
@@ -2119,7 +2102,7 @@ class WBInterface:
                 )
                 self.front_planted_swing_recovery_spent[front_planned_swing] = 1
             planted_front_postdrop_recovery_hold_s = float(
-                getattr(self, 'crawl_front_planted_postdrop_recovery_hold_s', 0.0)
+                getattr(self.crawl_params, 'front_planted_postdrop_recovery_hold_s', 0.0)
             )
             planted_front_postdrop_recovery_trigger = bool(
                 (not startup_full_stance_active)
@@ -2163,7 +2146,7 @@ class WBInterface:
         else:
             front_planted_posture_tail_candidate = False
         front_stance_support_tail_hold_s = float(
-            getattr(self, 'crawl_front_stance_support_tail_hold_s', 0.0)
+            getattr(self.crawl_params, 'front_stance_support_tail_hold_s', 0.0)
         )
         if front_stance_support_tail_hold_s > 1e-9:
             front_current_swing_state = (
@@ -2185,12 +2168,12 @@ class WBInterface:
                 and np.any(front_planned_swing & front_actual_swing_opened)
             )
             if front_stance_support_tail_trigger:
-                self.crawl_front_stance_support_tail_remaining_s = max(
-                    float(self.crawl_front_stance_support_tail_remaining_s),
+                self.crawl_state.front_stance_support_tail_remaining_s = max(
+                    float(self.crawl_state.front_stance_support_tail_remaining_s),
                     front_stance_support_tail_hold_s,
                 )
         front_close_gap_support_hold_s = float(
-            getattr(self, 'crawl_front_close_gap_support_hold_s', 0.0)
+            getattr(self.crawl_params, 'front_close_gap_support_hold_s', 0.0)
         )
         if front_close_gap_support_hold_s > 1e-9:
             front_close_gap_state = (
@@ -2212,15 +2195,15 @@ class WBInterface:
                     float(self.full_contact_recovery_remaining_s),
                     front_close_gap_support_hold_s,
                 )
-                self.crawl_front_stance_support_tail_remaining_s = max(
-                    float(self.crawl_front_stance_support_tail_remaining_s),
+                self.crawl_state.front_stance_support_tail_remaining_s = max(
+                    float(self.crawl_state.front_stance_support_tail_remaining_s),
                     front_close_gap_support_hold_s,
                 )
-                if bool(getattr(self, 'crawl_front_close_gap_keep_swing', False)):
+                if bool(getattr(self.crawl_params, 'front_close_gap_keep_swing', False)):
                     front_close_gap_keep_swing_mask = np.asarray(front_close_gap_state, dtype=bool).copy()
         front_late_posture_tail_candidate = False
         front_late_rearm_tail_hold_s = float(
-            getattr(self, 'crawl_front_late_rearm_tail_hold_s', 0.0)
+            getattr(self.crawl_params, 'front_late_rearm_tail_hold_s', 0.0)
         )
         if front_late_rearm_tail_hold_s > 1e-9:
             self.front_late_rearm_used_s[np.logical_not(front_planned_swing)] = 0.0
@@ -2232,7 +2215,7 @@ class WBInterface:
                 front_swing_leg_id = int(np.flatnonzero(front_current_swing_state)[0])
                 front_swing_time = float(self.stc.swing_time[front_swing_leg_id])
                 front_late_rearm_budget_s = max(
-                    float(getattr(self, 'crawl_front_late_rearm_budget_s', 0.0)),
+                    float(getattr(self.crawl_params, 'front_late_rearm_budget_s', 0.0)),
                     front_late_rearm_tail_hold_s,
                 )
                 front_late_rearm_remaining_budget_s = max(
@@ -2249,20 +2232,20 @@ class WBInterface:
                     and self.gait_name == 'crawl'
                     and recovery_posture_needed
                     and bool(np.all(actual_contact_array[2:4] == 1))
-                    and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+                    and float(self.crawl_state.front_stance_support_tail_remaining_s) <= 1e-9
                     and float(self.full_contact_recovery_remaining_s) <= 1e-9
                     and float(self.front_touchdown_support_recent_remaining_s) > 1e-9
                     and front_swing_time
-                    >= float(getattr(self, 'crawl_front_late_rearm_min_swing_time_s', 0.0))
+                    >= float(getattr(self.crawl_params, 'front_late_rearm_min_swing_time_s', 0.0))
                     and float(front_support_margins[front_swing_leg_id])
-                    <= -float(getattr(self, 'crawl_front_late_rearm_min_negative_margin', 0.0))
+                    <= -float(getattr(self.crawl_params, 'front_late_rearm_min_negative_margin', 0.0))
                     and float(front_late_rearm_chunk_s) > 1e-9
                 )
                 self.front_late_rearm_trigger_debug = int(bool(front_late_rearm_trigger))
                 front_late_posture_tail_candidate = bool(front_late_rearm_trigger)
                 if front_late_rearm_trigger:
-                    self.crawl_front_stance_support_tail_remaining_s = max(
-                        float(self.crawl_front_stance_support_tail_remaining_s),
+                    self.crawl_state.front_stance_support_tail_remaining_s = max(
+                        float(self.crawl_state.front_stance_support_tail_remaining_s),
                         float(front_late_rearm_chunk_s),
                     )
                     self.front_late_rearm_used_s[front_swing_leg_id] = min(
@@ -2550,7 +2533,6 @@ class WBInterface:
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
         self.rear_all_contact_front_planted_tail_alpha = 0.0
-        self.crawl_front_planted_seam_support_alpha = 0.0
         self.rear_all_contact_weak_leg_alpha = 0.0
         self.rear_all_contact_weak_leg_index = -1
         self.rear_close_handoff_alpha = 0.0
@@ -2613,7 +2595,7 @@ class WBInterface:
                         int(leg_id) < 2
                         and self.gait_name == 'crawl'
                         and release_timeout_s <= 1e-9
-                        and float(getattr(self, 'crawl_front_stuck_swing_release_timeout_s', 0.0)) > 1e-9
+                        and float(getattr(self.crawl_params, 'front_stuck_swing_release_timeout_s', 0.0)) > 1e-9
                     ):
                         ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
                         height_ratio = float(base_pos_measured[2]) / ref_height
@@ -2634,19 +2616,19 @@ class WBInterface:
                         )
                         posture_bad = bool(
                             (
-                                float(getattr(self, 'crawl_front_stuck_swing_release_height_ratio', 0.0)) > 1e-9
+                                float(getattr(self.crawl_params, 'front_stuck_swing_release_height_ratio', 0.0)) > 1e-9
                                 and float(height_ratio)
-                                <= float(getattr(self, 'crawl_front_stuck_swing_release_height_ratio', 0.0))
+                                <= float(getattr(self.crawl_params, 'front_stuck_swing_release_height_ratio', 0.0))
                             )
                             or (
-                                np.isfinite(getattr(self, 'crawl_front_stuck_swing_release_roll_threshold', np.inf))
+                                np.isfinite(getattr(self.crawl_params, 'front_stuck_swing_release_roll_threshold', np.inf))
                                 and float(roll_mag)
-                                >= float(getattr(self, 'crawl_front_stuck_swing_release_roll_threshold', np.inf))
+                                >= float(getattr(self.crawl_params, 'front_stuck_swing_release_roll_threshold', np.inf))
                             )
                             or (
-                                np.isfinite(getattr(self, 'crawl_front_stuck_swing_release_pitch_threshold', np.inf))
+                                np.isfinite(getattr(self.crawl_params, 'front_stuck_swing_release_pitch_threshold', np.inf))
                                 and float(pitch_mag)
-                                >= float(getattr(self, 'crawl_front_stuck_swing_release_pitch_threshold', np.inf))
+                                >= float(getattr(self.crawl_params, 'front_stuck_swing_release_pitch_threshold', np.inf))
                             )
                         )
                         if (
@@ -2659,7 +2641,7 @@ class WBInterface:
                             and posture_bad
                         ):
                             release_timeout_s = float(
-                                getattr(self, 'crawl_front_stuck_swing_release_timeout_s', 0.0)
+                                getattr(self.crawl_params, 'front_stuck_swing_release_timeout_s', 0.0)
                             )
                     if (not stuck_in_contact) or release_timeout_s <= 1e-9:
                         self.swing_contact_release_elapsed_s[leg_id] = 0.0
@@ -3899,22 +3881,22 @@ class WBInterface:
                 support_alpha = max(float(support_alpha), 1.0)
                 rear_support_alpha = max(float(rear_support_alpha), 1.0)
                 gate_forward_scale = min(gate_forward_scale, float(post_support_forward_scale))
-            if float(self.crawl_front_stance_support_tail_remaining_s) > 1e-9:
+            if float(self.crawl_state.front_stance_support_tail_remaining_s) > 1e-9:
                 gate_forward_scale = min(
                     gate_forward_scale,
-                    float(getattr(self, 'crawl_front_stance_support_tail_forward_scale', 1.0)),
+                    float(getattr(self.crawl_params, 'front_stance_support_tail_forward_scale', 1.0)),
                 )
                 for leg_id in range(2):
                     if bool(contact_sequence[leg_id][0] == 1) and bool(actual_contact[leg_id]):
                         self.touchdown_support_active[leg_id] = 1
                         support_alpha = max(float(support_alpha), 1.0)
                         front_support_alpha = max(float(front_support_alpha), 1.0)
-                self.crawl_front_stance_support_tail_remaining_s = max(
+                self.crawl_state.front_stance_support_tail_remaining_s = max(
                     0.0,
-                    float(self.crawl_front_stance_support_tail_remaining_s) - float(simulation_dt),
+                    float(self.crawl_state.front_stance_support_tail_remaining_s) - float(simulation_dt),
                 )
             else:
-                self.crawl_front_stance_support_tail_remaining_s = 0.0
+                self.crawl_state.front_stance_support_tail_remaining_s = 0.0
             all_actual_contact = bool(np.all(np.asarray(actual_contact, dtype=int) == 1))
             for leg_id in range(2, 4):
                 all_contact_support_needed = bool(
@@ -4121,7 +4103,7 @@ class WBInterface:
                     and rear_all_contact_posture_needed
                 )
                 planted_front_recovery_rearm_trigger_s = float(
-                    getattr(self, 'crawl_front_planted_swing_recovery_rearm_trigger_s', 0.0)
+                    getattr(self.crawl_params, 'front_planted_swing_recovery_rearm_trigger_s', 0.0)
                 )
                 front_planted_late_mask = (
                     (np.asarray(self.planned_contact[0:2], dtype=int) == 0)
@@ -4148,15 +4130,15 @@ class WBInterface:
                 )
                 front_planted_posture_bad = bool(
                     (
-                        float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
+                        float(getattr(self.crawl_params, 'front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
                         and float(height_ratio)
-                        <= float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0))
+                        <= float(getattr(self.crawl_params, 'front_planted_swing_recovery_height_ratio', 0.0))
                     )
                     or (
-                        getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', None) is not None
-                        and np.isfinite(float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0)))
+                        getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', None) is not None
+                        and np.isfinite(float(getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', 0.0)))
                         and float(roll_mag)
-                        >= float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0))
+                        >= float(getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', 0.0))
                     )
                 )
                 front_planted_posture_tail_trigger = bool(
@@ -4259,7 +4241,7 @@ class WBInterface:
                 else:
                     self.rear_all_contact_front_planted_tail_alpha = 0.0
                 front_planted_seam_support_hold_s = float(
-                    getattr(self, 'crawl_front_planted_seam_support_hold_s', 0.0)
+                    getattr(self.crawl_params, 'front_planted_seam_support_hold_s', 0.0)
                 )
                 if front_planted_seam_support_hold_s > 1e-9:
                     front_planted_post_recovery_drop_now = bool(
@@ -4290,36 +4272,36 @@ class WBInterface:
                         )
                     )
                     if front_planted_seam_support_trigger:
-                        self.crawl_front_planted_seam_support_remaining_s = max(
-                            float(self.crawl_front_planted_seam_support_remaining_s),
+                        self.crawl_state.front_planted_seam_support_remaining_s = max(
+                            float(self.crawl_state.front_planted_seam_support_remaining_s),
                             front_planted_seam_support_hold_s,
                         )
-                    elif float(self.crawl_front_planted_seam_support_remaining_s) > 1e-9:
-                        self.crawl_front_planted_seam_support_remaining_s = max(
+                    elif float(self.crawl_state.front_planted_seam_support_remaining_s) > 1e-9:
+                        self.crawl_state.front_planted_seam_support_remaining_s = max(
                             0.0,
-                            float(self.crawl_front_planted_seam_support_remaining_s) - float(simulation_dt),
+                            float(self.crawl_state.front_planted_seam_support_remaining_s) - float(simulation_dt),
                         )
                     else:
-                        self.crawl_front_planted_seam_support_remaining_s = 0.0
-                    if float(self.crawl_front_planted_seam_support_remaining_s) > 1e-9:
-                        self.crawl_front_planted_seam_support_alpha = float(
+                        self.crawl_state.front_planted_seam_support_remaining_s = 0.0
+                    if float(self.crawl_state.front_planted_seam_support_remaining_s) > 1e-9:
+                        self.crawl_state.front_planted_seam_support_alpha = float(
                             np.clip(
-                                float(self.crawl_front_planted_seam_support_remaining_s)
+                                float(self.crawl_state.front_planted_seam_support_remaining_s)
                                 / max(front_planted_seam_support_hold_s, 1e-6),
                                 0.0,
                                 1.0,
                             )
                         )
-                        if bool(getattr(self, 'crawl_front_planted_seam_keep_swing', False)):
+                        if bool(getattr(self.crawl_params, 'front_planted_seam_keep_swing', False)):
                             front_planted_seam_keep_swing_mask = np.asarray(
                                 front_planted_late_mask,
                                 dtype=bool,
                             ).copy()
                     else:
-                        self.crawl_front_planted_seam_support_alpha = 0.0
+                        self.crawl_state.front_planted_seam_support_alpha = 0.0
                 else:
-                    self.crawl_front_planted_seam_support_remaining_s = 0.0
-                    self.crawl_front_planted_seam_support_alpha = 0.0
+                    self.crawl_state.front_planted_seam_support_remaining_s = 0.0
+                    self.crawl_state.front_planted_seam_support_alpha = 0.0
                 if (
                     rear_all_contact_post_recovery_trigger
                     or front_late_posture_tail_trigger
@@ -4357,8 +4339,8 @@ class WBInterface:
                 self.rear_all_contact_front_planted_tail_remaining_s = 0.0
                 self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
                 self.rear_all_contact_front_planted_tail_alpha = 0.0
-                self.crawl_front_planted_seam_support_remaining_s = 0.0
-                self.crawl_front_planted_seam_support_alpha = 0.0
+                self.crawl_state.front_planted_seam_support_remaining_s = 0.0
+                self.crawl_state.front_planted_seam_support_alpha = 0.0
             full_contact_recovery_allcontact_release_tail_s = float(
                 getattr(self, 'full_contact_recovery_allcontact_release_tail_s', 0.0)
             )
@@ -4390,17 +4372,17 @@ class WBInterface:
                         full_contact_recovery_allcontact_release_tail_s,
                     )
             front_stance_support_tail_hold_s = float(
-                getattr(self, 'crawl_front_stance_support_tail_hold_s', 0.0)
+                getattr(self.crawl_params, 'front_stance_support_tail_hold_s', 0.0)
             )
             front_stance_release_tail_trigger = bool(
                 self.gait_name == 'crawl'
                 and float(front_stance_support_tail_hold_s) > 1e-9
                 and rear_all_contact_release_tail_trigger
-                and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+                and float(self.crawl_state.front_stance_support_tail_remaining_s) <= 1e-9
             )
             if front_stance_release_tail_trigger:
-                self.crawl_front_stance_support_tail_remaining_s = max(
-                    float(self.crawl_front_stance_support_tail_remaining_s),
+                self.crawl_state.front_stance_support_tail_remaining_s = max(
+                    float(self.crawl_state.front_stance_support_tail_remaining_s),
                     float(front_stance_support_tail_hold_s),
                 )
             self.rear_all_contact_weak_leg_alpha = 0.0
@@ -4501,7 +4483,7 @@ class WBInterface:
                     )
                     self.rear_all_contact_weak_leg_index = int(weak_rear_leg_id)
             front_planted_weak_share_ref = float(
-                getattr(self, 'crawl_front_planted_weak_rear_share_ref', 0.0)
+                getattr(self.crawl_params, 'front_planted_weak_rear_share_ref', 0.0)
             )
             if (
                 self.gait_name == 'crawl'
@@ -4537,15 +4519,15 @@ class WBInterface:
                 )
                 front_planted_posture_bad = bool(
                     (
-                        float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
+                        float(getattr(self.crawl_params, 'front_planted_swing_recovery_height_ratio', 0.0)) > 1e-9
                         and float(height_ratio)
-                        <= float(getattr(self, 'crawl_front_planted_swing_recovery_height_ratio', 0.0))
+                        <= float(getattr(self.crawl_params, 'front_planted_swing_recovery_height_ratio', 0.0))
                     )
                     or (
-                        getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', None) is not None
-                        and np.isfinite(float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0)))
+                        getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', None) is not None
+                        and np.isfinite(float(getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', 0.0)))
                         and float(roll_mag)
-                        >= float(getattr(self, 'crawl_front_planted_swing_recovery_roll_threshold', 0.0))
+                        >= float(getattr(self.crawl_params, 'front_planted_swing_recovery_roll_threshold', 0.0))
                     )
                 )
                 if (
@@ -4592,7 +4574,7 @@ class WBInterface:
                                     ),
                                 ),
                                 0.0,
-                                float(getattr(self, 'crawl_front_planted_weak_rear_alpha_cap', 1.0)),
+                                float(getattr(self.crawl_params, 'front_planted_weak_rear_alpha_cap', 1.0)),
                             )
                         )
                         self.rear_all_contact_weak_leg_alpha = float(front_planted_weak_alpha)
@@ -4607,7 +4589,7 @@ class WBInterface:
                     all_contact_now
                     and planned_all_contact_now
                     and float(rear_all_contact_alpha) <= 1e-9
-                    and float(self.crawl_front_stance_support_tail_remaining_s) <= 1e-9
+                    and float(self.crawl_state.front_stance_support_tail_remaining_s) <= 1e-9
                 )
                 if front_support_alpha > 1e-9 and (not steady_all_contact_hold):
                     self.front_touchdown_support_recent_remaining_s = float(self.full_contact_recovery_recent_window_s)
@@ -4779,7 +4761,7 @@ class WBInterface:
         if late_load_share_hold_s > 1e-9:
             front_planted_support_window_active = bool(
                 float(getattr(self, 'rear_all_contact_front_planted_tail_alpha', 0.0)) > 1e-9
-                or float(getattr(self, 'crawl_front_planted_seam_support_alpha', 0.0)) > 1e-9
+                or float(getattr(self.crawl_params, 'front_planted_seam_support_alpha', 0.0)) > 1e-9
             )
             late_load_share_trigger_enabled = bool(
                 self.gait_name == 'crawl'
@@ -5673,7 +5655,7 @@ class WBInterface:
         self.rear_touchdown_support_alpha = 0.0
         self.rear_all_contact_stabilization_alpha = 0.0
         self.rear_all_contact_front_planted_tail_alpha = 0.0
-        self.crawl_front_planted_seam_support_alpha = 0.0
+        self.crawl_state = CrawlState()
         self.rear_close_handoff_alpha = 0.0
         self.rear_close_handoff_leg_index = -1
         self.rear_late_load_share_alpha = 0.0
@@ -5682,8 +5664,6 @@ class WBInterface:
         self.front_touchdown_contact_vel_z_damping = 0.0
         self.rear_touchdown_contact_vel_z_damping = 0.0
         self.full_contact_recovery_remaining_s = 0.0
-        self.crawl_front_stance_support_tail_remaining_s = 0.0
-        self.crawl_front_planted_seam_support_remaining_s = 0.0
         self.front_rear_transition_guard_post_recovery_remaining_s = 0.0
         self.rear_all_contact_front_planted_tail_remaining_s = 0.0
         self.rear_all_contact_front_planted_tail_alpha_scale = 1.0
