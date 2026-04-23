@@ -24,6 +24,8 @@ If you need the broader upstream stack, see:
 - `installation/mamba/`
 - `installation/docker/`
 - `ros2/`
+  - baseline instructions: `ros2/README.md`
+  - environment check: `python ros2/preflight.py`
 
 The original upstream installation flow included:
 

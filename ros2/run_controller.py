@@ -1,15 +1,17 @@
-import rclpy 
-from rclpy.node import Node 
-from dls2_interface.msg import BaseState, BlindState, ControlSignal, TrajectoryGenerator, TimeDebug
-from sensor_msgs.msg import Joy
-
+import argparse
+import os
 import time
-import numpy as np
-np.set_printoptions(precision=3, suppress=True)
-
 import threading
 import multiprocessing
 from multiprocessing import shared_memory, Value
+
+import rclpy
+from rclpy.node import Node
+from dls2_interface.msg import BaseState, BlindState, ControlSignal, TrajectoryGenerator, TimeDebug
+from sensor_msgs.msg import Joy
+
+import numpy as np
+np.set_printoptions(precision=3, suppress=True)
 
 import copy
 
@@ -22,15 +24,6 @@ from gym_quadruped.utils.quadruped_utils import LegsAttr
 # Config imports
 from quadruped_pympc import config as cfg
 
-import sys
-import os 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-
-# Set the priority of the process
-pid = os.getpid()
-print("PID: ", pid)
-os.system("sudo renice -n -21 -p " + str(pid))
-os.system("sudo echo -20 > /proc/" + str(pid) + "/autogroup")
 
 # to reserve the core 4, 5 for the process, add in etc/default/grub
 # GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=4-5" in etc/default/grub
@@ -90,10 +83,100 @@ USE_SATURATED_LOOP_TIME = True # This is used to cap the clock time of periodic 
 USE_SMOOTH_VELOCITY = False
 USE_SMOOTH_HEIGHT = True
 
+
+def maybe_raise_process_priority(enable: bool, pid: int | None = None) -> None:
+    """Best-effort nice bump for Linux real-time experiments."""
+    if not enable or os.name != "posix" or not hasattr(os, "setpriority"):
+        return
+
+    target_pid = os.getpid() if pid is None else pid
+    try:
+        os.setpriority(os.PRIO_PROCESS, target_pid, -20)
+    except (PermissionError, OSError) as exc:
+        print(f"Priority tuning skipped for PID {target_pid}: {exc}")
+
+
+class RuntimeCommandState:
+    """Minimal command state used when the interactive console is disabled."""
+
+    def __init__(self) -> None:
+        self.walking = False
+        self.isDown = True
+        self.height_delta = -cfg.simulation_params['ref_z']
+        self.pitch_delta = 0.0
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="ROS2 Quadruped-PyMPC controller node.",
+    )
+    parser.add_argument(
+        "--controller",
+        default=cfg.mpc_params['type'],
+        choices=[
+            "nominal",
+            "input_rates",
+            "sampling",
+            "lyapunov",
+            "kinodynamic",
+            "linear_osqp",
+        ],
+        help="High-level MPC backend to instantiate.",
+    )
+    parser.add_argument(
+        "--gait",
+        default=cfg.simulation_params['gait'],
+        choices=sorted(cfg.simulation_params['gait_params'].keys()),
+        help="Gait profile passed into WBInterface at startup.",
+    )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=0.0,
+        help="Forward velocity command in m/s for non-joystick baseline runs.",
+    )
+    parser.add_argument(
+        "--lateral-speed",
+        type=float,
+        default=0.0,
+        help="Lateral velocity command in m/s for non-joystick baseline runs.",
+    )
+    parser.add_argument(
+        "--yaw-rate",
+        type=float,
+        default=0.0,
+        help="Yaw-rate command in rad/s for non-joystick baseline runs.",
+    )
+    parser.add_argument(
+        "--auto-start",
+        action="store_true",
+        help="Stand the robot up and start walking immediately.",
+    )
+    parser.add_argument(
+        "--no-console",
+        action="store_true",
+        help="Disable the interactive console thread for scripted baseline runs.",
+    )
+    parser.add_argument(
+        "--renice",
+        action="store_true",
+        help="Attempt best-effort Linux priority tuning for this process.",
+    )
+    return parser
+
 # Shell for the controllers ----------------------------------------------
 class Quadruped_PyMPC_Node(Node):
-    def __init__(self):
+    def __init__(self, runtime_args: argparse.Namespace):
         super().__init__('Quadruped_PyMPC_Node')
+        self.runtime_args = runtime_args
+        self.use_fixed_reference_command = any(
+            abs(value) > 1e-9
+            for value in (
+                self.runtime_args.speed,
+                self.runtime_args.lateral_speed,
+                self.runtime_args.yaw_rate,
+            )
+        )
 
         # Subscribers and Publishers
         self.subscription_base_state = self.create_subscription(BaseState,"/base_state", self.get_base_state_callback, 1)
@@ -209,13 +292,30 @@ class Quadruped_PyMPC_Node(Node):
             process_mpc.daemon = True
             process_mpc.start()
             
+        # Interactive command state ---------------------------
+        self.command_state = RuntimeCommandState()
+        if not self.runtime_args.no_console:
+            from console import Console
 
-        # Interactive Command Line ----------------------------
-        from console import Console
-        self.console = Console(controller_node=self)
-        thread_console = threading.Thread(target=self.console.interactive_command_line)
-        thread_console.daemon = True
-        thread_console.start()
+            self.command_state = Console(controller_node=self)
+            thread_console = threading.Thread(target=self.command_state.interactive_command_line)
+            thread_console.daemon = True
+            thread_console.start()
+
+        if self.runtime_args.auto_start:
+            self._activate_auto_start()
+
+        self.get_logger().info(
+            "ROS2 controller ready: "
+            f"mpc={cfg.mpc_params['type']}, gait={cfg.simulation_params['gait']}, "
+            f"auto_start={self.runtime_args.auto_start}, console={not self.runtime_args.no_console}, "
+            f"cmd=({self.runtime_args.speed:.3f}, {self.runtime_args.lateral_speed:.3f}, "
+            f"{self.runtime_args.yaw_rate:.3f})"
+        )
+        if self.runtime_args.no_console and not self.runtime_args.auto_start:
+            self.get_logger().warning(
+                "Console is disabled and auto-start is off; the robot will stay in full stance until commanded."
+            )
 
 
         # Init for real robot and simulation gain, since real robot needs different values
@@ -223,6 +323,68 @@ class Quadruped_PyMPC_Node(Node):
         #    self.wb_interface.stc.velocity_gain_fb = 10
         #    self.wb_interface.stc.use_feedback_linearization = False
         #    self.wb_interface.stc.use_friction_compensation = False
+
+    def _apply_fixed_reference_command(self) -> None:
+        if not self.use_fixed_reference_command:
+            return
+        self.env._ref_base_lin_vel_H[0] = self.runtime_args.speed
+        self.env._ref_base_lin_vel_H[1] = self.runtime_args.lateral_speed
+        self.env._ref_base_ang_yaw_dot = self.runtime_args.yaw_rate
+
+    def _activate_auto_start(self) -> None:
+        self.command_state.height_delta = 0.0
+        self.command_state.pitch_delta = 0.0
+        self.command_state.isDown = False
+        self.command_state.walking = True
+        self.wb_interface.pgg.gait_type = self.wb_interface.pgg.previous_gait_type
+        self.wb_interface.pgg.reset()
+        self._apply_fixed_reference_command()
+
+    def _compute_mpc_once(
+        self,
+        state_current,
+        ref_state,
+        contact_sequence,
+        inertia,
+        phase_signal,
+        step_freq,
+        optimize_swing,
+    ):
+        mpc_start = time.perf_counter()
+        (
+            nmpc_GRFs,
+            nmpc_footholds,
+            nmpc_joints_pos,
+            nmpc_joints_vel,
+            nmpc_joints_acc,
+            best_sample_freq,
+            nmpc_predicted_state,
+        ) = self.srbd_controller_interface.compute_control(
+            state_current,
+            ref_state,
+            contact_sequence,
+            inertia,
+            phase_signal,
+            step_freq,
+            optimize_swing,
+        )
+
+        if cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']:
+            # If the controller is gradient and is using RTI, we need to linearize
+            # the MPC after its computation to reduce the state-to-control delay.
+            self.srbd_controller_interface.compute_RTI()
+
+        last_mpc_loop_time = time.perf_counter() - mpc_start
+        return (
+            nmpc_GRFs,
+            nmpc_footholds,
+            nmpc_joints_pos,
+            nmpc_joints_vel,
+            nmpc_joints_acc,
+            best_sample_freq,
+            nmpc_predicted_state,
+            last_mpc_loop_time,
+        )
 
 
     def compute_mpc_thread_callback(self):
@@ -237,32 +399,23 @@ class Quadruped_PyMPC_Node(Node):
                     self.nmpc_joints_vel, \
                     self.nmpc_joints_acc, \
                     self.best_sample_freq,\
-                    self.nmpc_predicted_state = self.srbd_controller_interface.compute_control(self.state_current,
-                                                                            self.ref_state,
-                                                                            self.contact_sequence,
-                                                                            self.inertia,
-                                                                            self.wb_interface.pgg.phase_signal,
-                                                                            self.wb_interface.pgg.step_freq,
-                                                                            self.optimize_swing)
-                    
-                    if(cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']):
-                        # If the controller is gradient and is using RTI, we need to linearize the mpc after its computation
-                        # this helps to minize the delay between new state->control in a real case scenario.
-                        self.srbd_controller_interface.compute_RTI()
+                    self.nmpc_predicted_state, \
+                    self.last_mpc_loop_time = self._compute_mpc_once(self.state_current,
+                                                                     self.ref_state,
+                                                                     self.contact_sequence,
+                                                                     self.inertia,
+                                                                     self.wb_interface.pgg.phase_signal,
+                                                                     self.wb_interface.pgg.step_freq,
+                                                                     self.optimize_swing)
                     last_mpc_thread_time = time.time()
 
 
     def compute_mpc_process_queue_callback(self, input_data_process, output_data_process):
-        pid = os.getpid()
-        os.system("sudo renice -n -21 -p " + str(pid))
-        os.system("sudo echo -20 > /proc/" + str(pid) + "/autogroup")
+        maybe_raise_process_priority(self.runtime_args.renice)
         #affinity_mask = {6, 7} 
         #os.sched_setaffinity(pid, affinity_mask)
         
-        # This process runs forever!
-        last_mpc_process_time = time.time()
         while True:
-            #if time.time() - last_mpc_process_time > 1.0 / MPC_FREQ:
             if(not input_data_process.empty()):
                 data = input_data_process.get()
                 state_current = data[0]
@@ -279,39 +432,26 @@ class Quadruped_PyMPC_Node(Node):
                 nmpc_joints_vel, \
                 nmpc_joints_acc, \
                 best_sample_freq,\
-                nmpc_predicted_state = self.srbd_controller_interface.compute_control(state_current,
-                                                                        ref_state,
-                                                                        contact_sequence,
-                                                                        inertia,
-                                                                        phase_signal,
-                                                                        step_freq,
-                                                                        optimize_swing)
-                
-                
-                last_mpc_loop_time = time.time() - last_mpc_process_time
+                nmpc_predicted_state, \
+                last_mpc_loop_time = self._compute_mpc_once(state_current,
+                                                            ref_state,
+                                                            contact_sequence,
+                                                            inertia,
+                                                            phase_signal,
+                                                            step_freq,
+                                                            optimize_swing)
                 output_data_process.put([nmpc_GRFs, nmpc_footholds, nmpc_joints_pos, nmpc_joints_vel, nmpc_joints_acc, best_sample_freq, nmpc_predicted_state, last_mpc_loop_time])
-                
-                
-                if(cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']):
-                    # If the controller is gradient and is using RTI, we need to linearize the mpc after its computation
-                    # this helps to minize the delay between new state->control in a real case scenario.
-                    self.srbd_controller_interface.compute_RTI()
-                last_mpc_process_time = time.time()
 
 
     def compute_mpc_process_shared_memory_callback(self, input_data_process, shm_out_name: str, seq_out: Value):
-        pid = os.getpid()
-        os.system("sudo renice -n -21 -p " + str(pid))
-        os.system("sudo echo -20 > /proc/" + str(pid) + "/autogroup")
+        maybe_raise_process_priority(self.runtime_args.renice)
         #affinity_mask = {6, 7} 
         #os.sched_setaffinity(pid, affinity_mask)
 
         shm = shared_memory.SharedMemory(name=shm_out_name)
         arr = np.ndarray((N_DBL,), dtype=np.float64, buffer=shm.buf)
 
-        last_mpc_process_time = time.time()
         while True:
-            #if time.time() - last_mpc_process_time > 1.0 / MPC_FREQ:
             if(not input_data_process.empty()):
                 data = input_data_process.get()
                 state_current = data[0]
@@ -328,14 +468,14 @@ class Quadruped_PyMPC_Node(Node):
                 nmpc_joints_vel, \
                 nmpc_joints_acc, \
                 best_sample_freq,\
-                nmpc_predicted_state = self.srbd_controller_interface.compute_control(state_current,
-                                                                        ref_state,
-                                                                        contact_sequence,
-                                                                        inertia,
-                                                                        phase_signal,
-                                                                        step_freq,
-                                                                        optimize_swing)
-                last_mpc_loop_time = time.time() - last_mpc_process_time
+                nmpc_predicted_state, \
+                last_mpc_loop_time = self._compute_mpc_once(state_current,
+                                                            ref_state,
+                                                            contact_sequence,
+                                                            inertia,
+                                                            phase_signal,
+                                                            step_freq,
+                                                            optimize_swing)
 
                 # Publish to SHM with seqlock: odd=writing, even=stable
                 s = seq_out.value
@@ -344,18 +484,15 @@ class Quadruped_PyMPC_Node(Node):
                 # pack payload
                 arr[IDX_GRF]  = legsattr_to12(nmpc_GRFs)
                 arr[IDX_FH]   = legsattr_to12(nmpc_footholds)
-                arr[IDX_JP]   = (nmpc_joints_pos if nmpc_predicted_state is not None else np.zeros(12).reshape(-1)[:12])
-                arr[IDX_JV]   = (nmpc_joints_pos if nmpc_predicted_state is not None else np.zeros(12).reshape(-1)[:12])
-                arr[IDX_JA]   = (nmpc_joints_pos if nmpc_predicted_state is not None else np.zeros(12).reshape(-1)[:12])
+                arr[IDX_JP]   = legsattr_to12(nmpc_joints_pos)
+                arr[IDX_JV]   = legsattr_to12(nmpc_joints_vel)
+                arr[IDX_JA]   = legsattr_to12(nmpc_joints_acc)
                 arr[IDX_PRED] = np.asarray(nmpc_predicted_state).reshape(-1)[:12]
                 arr[IDX_BSF]  = float(best_sample_freq)
                 arr[IDX_LAST] = float(last_mpc_loop_time)
                 arr[IDX_STAMP]= float(time.monotonic())
                 # mark stable
                 seq_out.value = (s | 1) + 1
-
-                if cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']:
-                    self.srbd_controller_interface.compute_RTI()
 
 
     def get_base_state_callback(self, msg):
@@ -420,6 +557,7 @@ class Quadruped_PyMPC_Node(Node):
 
 
     def compute_control_callback(self):
+        self._apply_fixed_reference_command()
         
         # Update the loop time
         if(USE_FIXED_LOOP_TIME):
@@ -436,7 +574,7 @@ class Quadruped_PyMPC_Node(Node):
                     simulation_dt = 0.005
 
         # Safety check to not do anything until a first base and blind state are received
-        if(self.first_message_base_arrived==False and self.first_message_joints_arrived==False):
+        if(not self.first_message_base_arrived or not self.first_message_joints_arrived):
             return
 
         
@@ -517,10 +655,10 @@ class Quadruped_PyMPC_Node(Node):
                                                 ref_base_ang_vel)
 
 
-        
+
         # Console commands hacks
-        ref_state["ref_position"][2] += self.console.height_delta
-        ref_state["ref_orientation"][1] += self.console.pitch_delta
+        ref_state["ref_position"][2] += self.command_state.height_delta
+        ref_state["ref_orientation"][1] += self.command_state.pitch_delta
 
 
         
@@ -577,18 +715,14 @@ class Quadruped_PyMPC_Node(Node):
                 self.nmpc_joints_vel, \
                 self.nmpc_joints_acc, \
                 self.best_sample_freq, \
-                self.nmpc_predicted_state = self.srbd_controller_interface.compute_control(state_current,
-                                                                        ref_state,
-                                                                        contact_sequence,
-                                                                        inertia,
-                                                                        self.wb_interface.pgg.phase_signal,
-                                                                        self.wb_interface.pgg.step_freq,
-                                                                        optimize_swing)
-                
-                if(cfg.mpc_params['type'] != 'sampling' and cfg.mpc_params['use_RTI']):
-                    # If the controller is gradient and is using RTI, we need to linearize the mpc after its computation
-                    # this helps to minize the delay between new state->control in a real case scenario.
-                    self.srbd_controller_interface.compute_RTI()
+                self.nmpc_predicted_state, \
+                self.last_mpc_loop_time = self._compute_mpc_once(state_current,
+                                                                 ref_state,
+                                                                 contact_sequence,
+                                                                 inertia,
+                                                                 self.wb_interface.pgg.phase_signal,
+                                                                 self.wb_interface.pgg.step_freq,
+                                                                 optimize_swing)
         
                     
                 self.last_mpc_time = time.time()
@@ -646,11 +780,16 @@ class Quadruped_PyMPC_Node(Node):
 
 
 
-def main():
+def main(argv=None):
+    args = build_arg_parser().parse_args(argv)
+    cfg.mpc_params['type'] = args.controller
+    cfg.simulation_params['gait'] = args.gait
+    maybe_raise_process_priority(args.renice)
+
     print('Hello from Quadruped-PyMPC ros interface.')
     rclpy.init()
 
-    controller_node = Quadruped_PyMPC_Node()
+    controller_node = Quadruped_PyMPC_Node(args)
 
     rclpy.spin(controller_node)
     controller_node.destroy_node()
