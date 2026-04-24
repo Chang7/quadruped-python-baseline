@@ -8,6 +8,7 @@ The active tools tree is intentionally small.
   - benchmark and reproducibility entry points such as
     `run_trot_benchmark_suite.py`
   - ROS2 baseline launcher: `run_ros2_baseline.py`
+  - timed ROS2 baseline capture: `measure_ros2_baseline.py`
 
 Older temporary sweep scripts were moved out of the active tools tree and are
 now kept under:

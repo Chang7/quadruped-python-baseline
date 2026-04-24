@@ -23,6 +23,7 @@ from gym_quadruped.utils.quadruped_utils import LegsAttr
 
 # Config imports
 from quadruped_pympc import config as cfg
+from quadruped_pympc.profiles import dynamic_gait_profile_for
 
 
 # to reserve the core 4, 5 for the process, add in etc/default/grub
@@ -164,11 +165,29 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     return parser
 
+
+def configure_runtime_profile(runtime_args: argparse.Namespace) -> dict[str, float | int]:
+    """Align ROS2 runtime defaults with the standalone controller entrypoint."""
+    cfg.mpc_params['type'] = runtime_args.controller
+    cfg.simulation_params['gait'] = runtime_args.gait
+
+    applied_profile: dict[str, float | int] = {}
+    if runtime_args.controller == "linear_osqp":
+        applied_profile = dynamic_gait_profile_for(runtime_args.gait)
+        if applied_profile:
+            cfg.linear_osqp_params.update(applied_profile)
+        if runtime_args.gait in {"trot", "pace", "bound"}:
+            # Keep ROS2 baseline swing motion aligned with the MuJoCo runner.
+            cfg.simulation_params['step_height'] = 0.04
+
+    return applied_profile
+
 # Shell for the controllers ----------------------------------------------
 class Quadruped_PyMPC_Node(Node):
     def __init__(self, runtime_args: argparse.Namespace):
         super().__init__('Quadruped_PyMPC_Node')
         self.runtime_args = runtime_args
+        self.runtime_profile = configure_runtime_profile(runtime_args)
         self.use_fixed_reference_command = any(
             abs(value) > 1e-9
             for value in (
@@ -312,6 +331,11 @@ class Quadruped_PyMPC_Node(Node):
             f"cmd=({self.runtime_args.speed:.3f}, {self.runtime_args.lateral_speed:.3f}, "
             f"{self.runtime_args.yaw_rate:.3f})"
         )
+        if self.runtime_profile:
+            self.get_logger().info(
+                "Applied linear_osqp dynamic gait profile keys: "
+                + ", ".join(sorted(self.runtime_profile.keys()))
+            )
         if self.runtime_args.no_console and not self.runtime_args.auto_start:
             self.get_logger().warning(
                 "Console is disabled and auto-start is off; the robot will stay in full stance until commanded."
@@ -782,8 +806,6 @@ class Quadruped_PyMPC_Node(Node):
 
 def main(argv=None):
     args = build_arg_parser().parse_args(argv)
-    cfg.mpc_params['type'] = args.controller
-    cfg.simulation_params['gait'] = args.gait
     maybe_raise_process_priority(args.renice)
 
     print('Hello from Quadruped-PyMPC ros interface.')
