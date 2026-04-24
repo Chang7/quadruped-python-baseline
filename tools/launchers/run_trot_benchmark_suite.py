@@ -26,7 +26,7 @@ class TrotBenchmarkCase:
         cmd = [
             sys.executable,
             "-m",
-            "simulation.run_linear_osqp",
+            "mujoco_sim.run_linear_osqp",
             "--controller",
             self.controller,
             "--gait",

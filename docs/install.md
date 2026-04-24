@@ -38,11 +38,12 @@ The original upstream installation flow included:
 ## Quick local check
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
 ```
 
 ## Notes
 
 - The active simulation environment used in this workspace is the MuJoCo path
-  under `simulation/`.
+  under `mujoco_sim/`.
+- `simulation/` remains as a compatibility package for older commands.
 - Generated artifacts should always go under `outputs/`.

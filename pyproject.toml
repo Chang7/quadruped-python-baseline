@@ -57,6 +57,9 @@ sampling = [  # Example on how we can setup optional dependencies depending on t
 [tool.hatch.metadata]
 allow-direct-references = true  # Allow direct references to packages in the same repository
 
+[tool.hatch.build.targets.wheel]
+packages = ["quadruped_pympc", "mujoco_sim", "simulation"]
+
 
 #____________________________________________________________________________________________________________________
 [tool.ruff]  # Linter tool

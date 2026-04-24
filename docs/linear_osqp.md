@@ -28,13 +28,13 @@ while reusing the stock-style MuJoCo realization path.
 Short custom trot:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.0
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --yaw-rate 0.0
 ```
 
 Current crawl diagnostic:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --seconds 20 --speed 0.12 --yaw-rate 0.0
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait crawl --seconds 20 --speed 0.12 --yaw-rate 0.0
 ```
 
 ## Main files
@@ -43,4 +43,4 @@ python -m simulation.run_linear_osqp --controller linear_osqp --gait crawl --sec
 - `quadruped_pympc/helpers/foothold_reference_generator.py`
 - `quadruped_pympc/helpers/rear_transition_manager.py`
 - `quadruped_pympc/interfaces/wb_interface.py`
-- `simulation/run_linear_osqp.py`
+- `mujoco_sim/run_linear_osqp.py`

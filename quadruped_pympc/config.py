@@ -1,5 +1,5 @@
-"""This file includes all of the configuration parameters for the MPC controllers
-and of the internal simulations that can be launch from the folder /simulation.
+"""This file includes all configuration parameters for the MPC controllers
+and the MuJoCo/ROS2 backend entry points.
 """
 import os
 import numpy as np

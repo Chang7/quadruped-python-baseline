@@ -43,13 +43,13 @@ pip install -e .
 Run on Aliengo (default):
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
 ```
 
 Run on Go1:
 
 ```bash
-QUADRUPED_PYMPC_ROBOT=go1 python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
+QUADRUPED_PYMPC_ROBOT=go1 python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12
 ```
 
 ## Benchmarks
@@ -57,25 +57,25 @@ QUADRUPED_PYMPC_ROBOT=go1 python -m simulation.run_linear_osqp --controller line
 Straight 20 s:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 20 --speed 0.12 --artifact-dir outputs/repro_straight
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 20 --speed 0.12 --artifact-dir outputs/repro_straight
 ```
 
 Turn 10 s:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 10 --speed 0.10 --yaw-rate 0.3 --artifact-dir outputs/repro_turn
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 10 --speed 0.10 --yaw-rate 0.3 --artifact-dir outputs/repro_turn
 ```
 
 Disturbance 4 s:
 
 ```bash
-python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_disturb
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 4 --speed 0.12 --disturbance-pulse x:0.5:0.25:4.0 --disturbance-pulse x:2.3:0.25:8.0 --artifact-dir outputs/repro_disturb
 ```
 
 Stock sampling comparison:
 
 ```bash
-python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --artifact-dir outputs/repro_stock
+python -m mujoco_sim.run_linear_osqp --controller sampling --gait trot --seconds 4 --speed 0.12 --artifact-dir outputs/repro_stock
 ```
 
 ## Repository layout
@@ -84,11 +84,13 @@ python -m simulation.run_linear_osqp --controller sampling --gait trot --seconds
 quadruped_pympc/          controller and helper code
   controllers/linear_osqp/  linear QP MPC (the custom part)
   interfaces/               whole-body interface (stock-based, extended)
-simulation/               MuJoCo runners
+mujoco_sim/              MuJoCo direct backend
   run_linear_osqp.py        main entry point
   simulation.py             sim loop
   artifacts.py              logging / summary
   crawl_preset.py           crawl-specific diagnostic parameters
+ros2/                     upstream-style ROS2 bridge and baseline notes
+simulation/               compatibility wrappers for older MuJoCo commands
 tools/                    benchmark launcher
 1.Quadruped-PyMPC-main/   read-only upstream reference
 ```
@@ -104,6 +106,8 @@ Each `summary.json` records per-step timing when `linear_osqp` is used:
 
 - Robot selection: set `QUADRUPED_PYMPC_ROBOT=go1` (or `aliengo`, default).
 - Robot-specific posture offsets are in `_robot_posture_offsets()` in
-  `run_linear_osqp.py`.
+  `quadruped_pympc/profiles/`.
+- Old `python -m simulation.run_linear_osqp ...` commands still work through a
+  compatibility wrapper, but new scripts should use `mujoco_sim`.
 - Crawl is a diagnostic scenario, not a stable benchmark. Stock sampling also
   terminates early (~1.4-2.8 s) in the same crawl setting.

@@ -1,1 +1,5 @@
-# Created by danfoa at 03/07/24
+"""Compatibility package for old MuJoCo runner imports.
+
+New code should import from :mod:`mujoco_sim`.
+"""
+
