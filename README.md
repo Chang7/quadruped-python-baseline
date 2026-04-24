@@ -102,6 +102,20 @@ Each `summary.json` records per-step timing when `linear_osqp` is used:
 - `linear_solve_wall_ms_mean` / `max` — OSQP QP solve time
 - `linear_solve_total_ms_mean` / `max` — setup + solve time
 
+## Validation
+
+After the MuJoCo backend split, both the new canonical entry point and the old
+compatibility path were smoke-tested in the WSL MuJoCo/ROS2 environment:
+
+```bash
+python -m mujoco_sim.run_linear_osqp --controller linear_osqp --gait trot --seconds 1 --speed 0.12 --no-plots --no-mp4 --artifact-dir outputs/smoke_mujoco_sim
+python -m simulation.run_linear_osqp --controller linear_osqp --gait trot --seconds 1 --speed 0.12 --no-plots --no-mp4 --artifact-dir outputs/smoke_simulation_compat
+```
+
+Both runs completed `499` steps (`0.996 s`) without termination or truncation.
+The generated summaries are under `outputs/smoke_mujoco_sim/episode_000/` and
+`outputs/smoke_simulation_compat/episode_000/`.
+
 ## Notes
 
 - Robot selection: set `QUADRUPED_PYMPC_ROBOT=go1` (or `aliengo`, default).
