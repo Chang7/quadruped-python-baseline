@@ -603,8 +603,10 @@ class Quadruped_PyMPC_Node(Node):
 
         
         # Update the mujoco model
-        #self.env.mjData.qpos[0:3] = copy.deepcopy(self.position) # s.e. height
-        self.env.mjData.qpos[0:3] = np.zeros(3) # proprioceptive height
+        # Keep the controller origin-free in x/y, but preserve measured base
+        # height so WBInterface logic sees the same vertical state as ROS2.
+        self.env.mjData.qpos[0:2] = 0.0
+        self.env.mjData.qpos[2] = float(self.position[2])
         self.env.mjData.qpos[3:7] = copy.deepcopy(self.orientation)
         self.env.mjData.qvel[0:3] = copy.deepcopy(self.linear_velocity)
         self.env.mjData.qvel[3:6] = copy.deepcopy(self.angular_velocity)
