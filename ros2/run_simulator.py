@@ -88,12 +88,9 @@ class Simulator_Node(Node):
 
     def _read_feet_contact_state(self) -> list[bool]:
         try:
-            feet_contact_state, _, _ = self.env.feet_contact_state(ground_reaction_forces=True)
+            feet_contact_state, _ = self.env.feet_contact_state()
         except Exception:
-            try:
-                feet_contact_state, _ = self.env.feet_contact_state()
-            except Exception:
-                return [False, False, False, False]
+            return [False, False, False, False]
         return [bool(contact) for contact in feet_contact_state]
 
 

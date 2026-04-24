@@ -2747,7 +2747,13 @@ class WBInterface(CrawlRecoveryMixin, LinearTimingParamsMixin):
             pitch_mag = abs(float(base_ori_euler_xyz[1]))
             ref_height = max(float(cfg.simulation_params.get('ref_z', 0.0)), 1e-6)
             height_ratio = float(base_pos_measured[2]) / ref_height
-            vertical_grf = np.maximum(np.asarray(foot_grf_world, dtype=float)[:, 2], 0.0)
+            if foot_grf_world is not None:
+                try:
+                    vertical_grf = np.maximum(np.asarray(foot_grf_world, dtype=float)[:, 2], 0.0)
+                except Exception:
+                    vertical_grf = np.zeros(4, dtype=float)
+            else:
+                vertical_grf = np.zeros(4, dtype=float)
             total_vertical_grf = max(float(np.sum(vertical_grf)), 1e-6)
             rear_vertical_grf = max(float(np.sum(vertical_grf[2:4])), 1e-6)
             rear_load_share = float(np.sum(vertical_grf[2:4])) / total_vertical_grf
