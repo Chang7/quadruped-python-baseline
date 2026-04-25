@@ -92,7 +92,7 @@ mujoco_sim/              MuJoCo direct backend
 ros2/                     upstream-style ROS2 bridge and baseline notes
 simulation/               compatibility wrappers for older MuJoCo commands
 tools/                    benchmark launcher
-1.Quadruped-PyMPC-main/   read-only upstream reference
+references/               read-only reference material (upstream PyMPC, legacy baseline, etc.)
 ```
 
 ## Timing

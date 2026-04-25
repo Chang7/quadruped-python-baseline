@@ -60,7 +60,7 @@ committed to GitHub.
 
 ## Working Rules
 
-- Save new outputs here, not inside `1.Quadruped-PyMPC-main/`.
+- Save new outputs here, not inside `references/upstream_pympc/`.
 - Use clearly named folders for meaningful runs.
 - If a result is only a temporary probe or a superseded comparison, move it to
   `outputs/archive/` briefly, then prune it if it no longer explains the

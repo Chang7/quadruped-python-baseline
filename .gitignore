@@ -176,7 +176,8 @@ ros2/msgs_ws/install/
 ros2/msgs_ws/log/
 
 # Repository-specific exclusions for the cleaned working tree
-1.Quadruped-PyMPC-main/
+references/upstream_pympc/
+references/upstream_pympc_paper.pdf
 archive/backups/
 references/external_repos/
 references/notes/raw_extracts/
@@ -197,6 +198,6 @@ tmp_remote_repo/
 Quadruped-PyMPC_linear_osqp_adapter.zip
 
 # Legacy baseline should stay code-only in this repo
-legacy/python_baseline/outputs/
-legacy/python_baseline/.venv/
-legacy/python_baseline/mujoco_menagerie/
+references/legacy_python_baseline/outputs/
+references/legacy_python_baseline/.venv/
+references/legacy_python_baseline/mujoco_menagerie/

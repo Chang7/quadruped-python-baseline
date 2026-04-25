@@ -1,17 +1,33 @@
 # References
 
-This folder is for read-only reference material, not for active development.
+This folder collects all read-only reference material — code snapshots, the
+upstream package, the legacy Python baseline, and porting notes. Nothing here
+is part of the active build path.
 
-## external_repos
+## upstream_pympc/
 
-Local copies of external repositories or imported code snapshots:
+Read-only copy of the DLS Lab Quadruped-PyMPC stock repository (Python). This
+is the base we forked when starting the linear-OSQP adapter.
 
-- `Cheetah-Software`
-- `legged_control`
-- `Quadruped-PyMPC-upstream`
-- `matlab_linear_zip`
+- `upstream_pympc_paper.pdf` — accompanying LTV-MPC paper.
 
-## notes
+## legacy_python_baseline/
+
+Earlier standalone Python MPC baseline and MuJoCo prototype, kept for
+historical comparison.
+
+## external_repos/
+
+Local copies of other relevant repositories used for design comparison only:
+
+- `Cheetah-Software` — MIT Cheetah controller stack (C++).
+- `legged_control` — alternative legged-robot controller reference.
+- `Quadruped-PyMPC-upstream` — older snapshot kept for diff history.
+- `matlab_linear_zip` — early Python snapshot of the MATLAB-to-PyMPC migration
+  (despite the name there are no `.m` files; it is the first port).
+- `claude-token-efficient` — collaboration-tooling reference.
+
+## notes/
 
 Working notes derived from comparison and porting:
 

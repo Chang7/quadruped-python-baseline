@@ -2,7 +2,7 @@
 
 ## What Was Verified
 
-- The stock repo at `1.Quadruped-PyMPC-main/Quadruped-PyMPC-main` can run inside the current WSL venv.
+- The stock repo at `references/upstream_pympc/` can run inside the current WSL venv.
 - Default `nominal` backend does not run yet because `acados_template` is not installed.
 - After installing CPU `jax`, the stock `sampling` backend runs headless.
 - Repro script:
